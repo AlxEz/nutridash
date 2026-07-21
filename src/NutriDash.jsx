@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed,
+  UtensilsCrossed, Activity,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -46,6 +46,17 @@ function scaleFood(food, grams) {
   return { kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor };
 }
 
+/** Infiere la categoría por macro dominante (kcal aportadas): respaldo para alimentos guardados sin `category`. */
+function inferCategory(food) {
+  const pk = (food.p || 0) * 4, ck = (food.c || 0) * 4, fk = (food.f || 0) * 9;
+  if (fk >= pk && fk >= ck) return "grasa";
+  if (ck >= pk) return "carbohidrato";
+  return "proteina";
+}
+function foodCategory(food) {
+  return food.category ?? inferCategory(food);
+}
+
 /**
  * Calcula cuántos gramos del alimento destino igualan el aporte del
  * macronutriente principal (según la categoría) del alimento origen.
@@ -74,36 +85,91 @@ function formatDateEs(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`);
   return d.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
 }
+function targetsLabel(catalogEx) {
+  if (!catalogEx?.targets) return "";
+  const primary = catalogEx.targets.filter((t) => t.role === "primary").map((t) => t.group);
+  const secondary = catalogEx.targets.filter((t) => t.role === "secondary").map((t) => t.group);
+  return primary.join(", ") + (secondary.length ? ` · +${secondary.join(", +")}` : "");
+}
 
 /* ---------------------------------------------------------
    BASE DE EJERCICIOS (Fase 2 — precargada)
 --------------------------------------------------------- */
+const P = "primary", S = "secondary";
+const t1 = (g) => [{ group: g, role: P }];
+const t2 = (g1, g2) => [{ group: g1, role: P }, { group: g2, role: S }];
+const t3 = (g1, g2, g3) => [{ group: g1, role: P }, { group: g2, role: S }, { group: g3, role: S }];
+
 const DEFAULT_EXERCISE_CATALOG = [
-  { name: "Sentadilla", muscleGroup: "Pierna" },
-  { name: "Peso muerto", muscleGroup: "Espalda / pierna" },
-  { name: "Peso muerto rumano", muscleGroup: "Isquiotibiales" },
-  { name: "Press de banca", muscleGroup: "Pecho" },
-  { name: "Press inclinado", muscleGroup: "Pecho" },
-  { name: "Press militar", muscleGroup: "Hombro" },
-  { name: "Elevaciones laterales", muscleGroup: "Hombro" },
-  { name: "Remo", muscleGroup: "Espalda" },
-  { name: "Jalón al pecho", muscleGroup: "Espalda" },
-  { name: "Dominadas", muscleGroup: "Espalda" },
-  { name: "Curl de bíceps", muscleGroup: "Bíceps" },
-  { name: "Curl martillo", muscleGroup: "Bíceps" },
-  { name: "Extensión de tríceps", muscleGroup: "Tríceps" },
-  { name: "Press francés", muscleGroup: "Tríceps" },
-  { name: "Fondos", muscleGroup: "Tríceps / pecho" },
-  { name: "Prensa de piernas", muscleGroup: "Pierna" },
-  { name: "Zancadas", muscleGroup: "Pierna" },
-  { name: "Extensión de cuádriceps", muscleGroup: "Cuádriceps" },
-  { name: "Curl femoral", muscleGroup: "Isquiotibiales" },
-  { name: "Hip thrust", muscleGroup: "Glúteo" },
-  { name: "Gemelos de pie", muscleGroup: "Pantorrilla" },
-  { name: "Face pull", muscleGroup: "Hombro posterior" },
-  { name: "Plancha", muscleGroup: "Core" },
-  { name: "Abdominales", muscleGroup: "Core" },
+  // Cuádriceps
+  { name: "Sentadilla", targets: t2("Cuádriceps", "Glúteos") },
+  { name: "Prensa de piernas", targets: t2("Cuádriceps", "Glúteos") },
+  { name: "Extensión de cuádriceps", targets: t1("Cuádriceps") },
+  { name: "Sentadilla búlgara", targets: t2("Cuádriceps", "Glúteos") },
+  // Isquiotibiales / Femoral
+  { name: "Peso muerto rumano", targets: t3("Isquiotibiales/Femoral", "Glúteos", "Espalda Baja/Lumbares") },
+  { name: "Curl femoral", targets: t1("Isquiotibiales/Femoral") },
+  { name: "Peso muerto piernas rígidas", targets: t3("Isquiotibiales/Femoral", "Glúteos", "Espalda Baja/Lumbares") },
+  { name: "Curl nórdico", targets: t1("Isquiotibiales/Femoral") },
+  // Glúteos
+  { name: "Hip thrust", targets: t2("Glúteos", "Isquiotibiales/Femoral") },
+  { name: "Elevación de cadera a una pierna", targets: t2("Glúteos", "Isquiotibiales/Femoral") },
+  { name: "Patada de glúteo en polea", targets: t1("Glúteos") },
+  { name: "Puente de glúteo", targets: t1("Glúteos") },
+  // Aductores / Abductores
+  { name: "Máquina de aductores", targets: t1("Aductores/Abductores") },
+  { name: "Máquina de abductores", targets: t1("Aductores/Abductores") },
+  { name: "Sentadilla sumo", targets: t3("Aductores/Abductores", "Cuádriceps", "Glúteos") },
+  // Gemelos / Pantorrillas
+  { name: "Gemelos de pie", targets: t1("Gemelos/Pantorrillas") },
+  { name: "Gemelos sentado", targets: t1("Gemelos/Pantorrillas") },
+  { name: "Elevación de talones en prensa", targets: t1("Gemelos/Pantorrillas") },
+  // Dorsales
+  { name: "Dominadas", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
+  { name: "Jalón al pecho", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
+  { name: "Remo con barra", targets: t2("Dorsales", "Espalda Alta/Trapecios") },
+  { name: "Pullover", targets: t1("Dorsales") },
+  // Espalda Alta / Trapecios
+  { name: "Encogimientos (shrugs)", targets: t1("Espalda Alta/Trapecios") },
+  { name: "Remo alto", targets: t2("Espalda Alta/Trapecios", "Hombro") },
+  { name: "Remo Pendlay", targets: t2("Espalda Alta/Trapecios", "Dorsales") },
+  // Espalda Baja / Lumbares
+  { name: "Peso muerto convencional", targets: t3("Espalda Baja/Lumbares", "Isquiotibiales/Femoral", "Glúteos") },
+  { name: "Hiperextensión en banco romano", targets: t1("Espalda Baja/Lumbares") },
+  { name: "Superman", targets: t1("Espalda Baja/Lumbares") },
+  { name: "Buenos días", targets: t2("Espalda Baja/Lumbares", "Isquiotibiales/Femoral") },
+  // Pecho
+  { name: "Press de banca", targets: t3("Pecho", "Tríceps", "Hombro") },
+  { name: "Press inclinado", targets: t3("Pecho", "Hombro", "Tríceps") },
+  { name: "Press declinado", targets: t2("Pecho", "Tríceps") },
+  { name: "Aperturas con mancuerna", targets: t1("Pecho") },
+  // Hombro (deltoide anterior, lateral y posterior)
+  { name: "Press militar", targets: t2("Hombro", "Tríceps") }, // anterior
+  { name: "Elevaciones laterales", targets: t1("Hombro") }, // lateral
+  { name: "Pájaros (deltoide posterior)", targets: t1("Hombro") }, // posterior
+  { name: "Face pull", targets: t2("Hombro", "Espalda Alta/Trapecios") }, // posterior
+  // Bíceps
+  { name: "Curl de bíceps con barra", targets: t1("Bíceps") },
+  { name: "Curl martillo", targets: t1("Bíceps") },
+  { name: "Curl concentrado", targets: t1("Bíceps") },
+  { name: "Curl inclinado con mancuerna", targets: t1("Bíceps") },
+  // Tríceps
+  { name: "Extensión de tríceps en polea", targets: t1("Tríceps") },
+  { name: "Press francés", targets: t1("Tríceps") },
+  { name: "Fondos en banco", targets: t2("Tríceps", "Pecho") },
+  { name: "Patada de tríceps", targets: t1("Tríceps") },
+  // Abdomen
+  { name: "Plancha", targets: t1("Abdomen") },
+  { name: "Abdominales", targets: t1("Abdomen") },
+  { name: "Elevación de piernas colgado", targets: t1("Abdomen") },
+  { name: "Rueda abdominal", targets: t1("Abdomen") },
 ].map((e, i) => ({ id: `ex${i + 1}`, isCustom: false, ...e }));
+
+const MUSCLE_GROUPS = [
+  "Cuádriceps", "Isquiotibiales/Femoral", "Glúteos", "Aductores/Abductores", "Gemelos/Pantorrillas",
+  "Dorsales", "Espalda Alta/Trapecios", "Espalda Baja/Lumbares",
+  "Pecho", "Hombro", "Bíceps", "Tríceps", "Abdomen",
+];
 
 const backBtnStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 const iconBtnStyle = { background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 7, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-dim)" };
@@ -296,6 +362,143 @@ function WeightChart({ logs }) {
   );
 }
 
+/* ---------------------------------------------------------
+   MAPA MUSCULAR — cuerpo frontal + espalda, series por grupo
+   Estilo low-poly: cada zona es un polígono con una faceta de
+   brillo (versión encogida del mismo polígono en blanco translúcido).
+--------------------------------------------------------- */
+const VOLUME_CAP = 12; // series efectivas/semana a partir de las cuales la zona queda al 100% de intensidad
+const SECONDARY_SET_WEIGHT = 0.5; // una serie de un ejercicio donde el grupo es secundario cuenta como media serie efectiva
+
+function muscleZoneColor(count) {
+  const t = Math.min(count / VOLUME_CAP, 1);
+  const base = [26, 23, 36];      // neutro (0 series)
+  const active = [139, 92, 246];  // var(--accent)
+  const rgb = base.map((b, i) => Math.round(b + (active[i] - b) * t));
+  return `rgb(${rgb.join(",")})`;
+}
+
+/** Encoge un polígono hacia su centroide, para dibujar una faceta de brillo encima. */
+function shrinkPoly(points, factor = 0.5) {
+  const pts = points.trim().split(" ").map((p) => p.split(",").map(Number));
+  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  return pts.map(([x, y]) => `${(cx + (x - cx) * factor).toFixed(1)},${(cy + (y - cy) * factor).toFixed(1)}`).join(" ");
+}
+
+// parts: cada una es { d, lx, ly } — d = polígono low-poly de la zona, lx/ly = badge de conteo.
+// Un grupo con 2 partes (izq/der) muestra el mismo conteo en ambas.
+const zone = (group, parts) => ({ group, parts });
+const mirror = (points) => points.trim().split(" ").map((p) => { const [x, y] = p.split(","); return `${(160 - Number(x)).toFixed(1)},${y}`; }).join(" ");
+
+const DELTOID_L = "18,42 34,38 42,52 36,66 22,64 14,54";
+const ARM_BACK_L = "22,72 36,74 40,96 34,120 20,118 16,94";
+const ARM_FRONT_L = "24,72 36,74 38,96 32,118 22,116 18,94";
+
+const FRONT_ZONES = [
+  zone("Hombro", [{ d: DELTOID_L, lx: 12, ly: 40 }, { d: mirror(DELTOID_L), lx: 148, ly: 40 }]),
+  zone("Pecho", [
+    { d: "80,54 66,58 58,72 64,86 80,82", lx: 58, ly: 68 },
+    { d: mirror("80,54 66,58 58,72 64,86 80,82"), lx: 102, ly: 68 },
+  ]),
+  zone("Bíceps", [{ d: ARM_FRONT_L, lx: 12, ly: 96 }, { d: mirror(ARM_FRONT_L), lx: 148, ly: 96 }]),
+  zone("Abdomen", [{ d: "64,88 96,88 100,150 92,168 68,168 60,150", lx: 80, ly: 128 }]),
+  zone("Cuádriceps", [
+    { d: "50,198 76,198 74,255 68,300 56,300 52,255", lx: 63, ly: 250 },
+    { d: mirror("50,198 76,198 74,255 68,300 56,300 52,255"), lx: 97, ly: 250 },
+  ]),
+  zone("Aductores/Abductores", [{ d: "74,205 86,205 84,270 76,270", lx: 80, ly: 236 }]),
+];
+
+const BACK_ZONES = [
+  zone("Hombro", [{ d: DELTOID_L, lx: 12, ly: 40 }, { d: mirror(DELTOID_L), lx: 148, ly: 40 }]),
+  zone("Espalda Alta/Trapecios", [{ d: "80,40 100,46 92,80 68,80 60,46", lx: 80, ly: 52 }]),
+  zone("Dorsales", [
+    { d: "58,58 76,62 70,120 52,140 44,90", lx: 40, ly: 105 },
+    { d: mirror("58,58 76,62 70,120 52,140 44,90"), lx: 120, ly: 105 },
+  ]),
+  zone("Tríceps", [{ d: ARM_BACK_L, lx: 12, ly: 96 }, { d: mirror(ARM_BACK_L), lx: 148, ly: 96 }]),
+  zone("Espalda Baja/Lumbares", [{ d: "66,142 94,142 90,168 70,168", lx: 80, ly: 155 }]),
+  zone("Glúteos", [
+    { d: "54,172 78,170 80,200 66,212 50,200", lx: 62, ly: 190 },
+    { d: mirror("54,172 78,170 80,200 66,212 50,200"), lx: 98, ly: 190 },
+  ]),
+  zone("Isquiotibiales/Femoral", [
+    { d: "50,205 76,205 72,268 60,285 48,268", lx: 62, ly: 245 },
+    { d: mirror("50,205 76,205 72,268 60,285 48,268"), lx: 98, ly: 245 },
+  ]),
+  zone("Gemelos/Pantorrillas", [
+    { d: "52,290 70,290 66,330 56,330", lx: 61, ly: 310 },
+    { d: mirror("52,290 70,290 66,330 56,330"), lx: 99, ly: 310 },
+  ]),
+];
+
+// silueta neutra low-poly: cabeza, tronco con cintura, brazos y piernas con quiebre — decorativa, sin conteo
+function BodySilhouette() {
+  return (
+    <g fill="#14121C" stroke="#2E293D" strokeWidth="1.3">
+      <polygon points="80,8 90,11 93,20 90,30 70,30 67,20 70,11" />
+      <polygon points="74,30 86,30 84,41 76,41" />
+      <polygon points="45,42 115,42 112,120 100,195 60,195 48,120" />
+      <polygon points="20,45 42,45 40,95 36,150 14,150 18,95" />
+      <polygon points="140,45 118,45 120,95 124,150 146,150 142,95" />
+      <polygon points="12,148 24,148 22,168 14,168" />
+      <polygon points="148,148 136,148 138,168 146,168" />
+      <polygon points="52,195 78,195 76,270 74,340 50,340 52,270" />
+      <polygon points="108,195 82,195 84,270 86,340 110,340 108,270" />
+      <polygon points="44,338 60,338 58,356 44,354" />
+      <polygon points="116,338 100,338 102,356 116,354" />
+    </g>
+  );
+}
+
+function ZonePoly({ d, fill, glow }) {
+  return (
+    <g filter={glow ? "url(#bodyGlow)" : undefined}>
+      <polygon points={d} fill={fill} stroke="#4B4658" strokeWidth="1" strokeLinejoin="round" />
+      <polygon points={shrinkPoly(d, 0.5)} fill="#FFFFFF" opacity="0.07" />
+    </g>
+  );
+}
+
+function BodyFigure({ zones, offsetX, title }) {
+  return (
+    <g transform={`translate(${offsetX}, 0)`}>
+      <BodySilhouette />
+      {zones.map((z) => {
+        const count = z.__count;
+        const fill = muscleZoneColor(count);
+        const glow = count >= 8;
+        return z.parts.map((p, i) => (
+          <g key={`${z.group}-${i}`}>
+            <ZonePoly d={p.d} fill={fill} glow={glow} />
+            <circle cx={p.lx} cy={p.ly} r="7.5" fill="#0A0810CC" stroke={fill} strokeWidth="1.2" />
+            <text x={p.lx} y={p.ly + 2.7} textAnchor="middle" fontSize="7.5" fontFamily="'JetBrains Mono', monospace" fill="#D8D4E6" fontWeight="700">{round(count, 1)}</text>
+          </g>
+        ));
+      })}
+      <text x="80" y="372" textAnchor="middle" fontSize="11" fill="#6B7488" fontFamily="'Rajdhani', sans-serif" fontWeight="700" letterSpacing="1">{title}</text>
+    </g>
+  );
+}
+
+/** volumeMap: { [muscleGroup]: seriesEfectivas } */
+function MuscleBodyMap({ volumeMap }) {
+  const withCounts = (zones) => zones.map((z) => ({ ...z, __count: volumeMap[z.group] || 0 }));
+  return (
+    <svg viewBox="0 0 340 385" style={{ width: "100%", display: "block" }}>
+      <defs>
+        <filter id="bodyGlow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      <BodyFigure zones={withCounts(FRONT_ZONES)} offsetX={0} title="FRENTE" />
+      <BodyFigure zones={withCounts(BACK_ZONES)} offsetX={180} title="ESPALDA" />
+    </svg>
+  );
+}
+
 function MacroBar({ icon: Icon, label, consumed, target, color }) {
   const pct = target > 0 ? Math.min((consumed / target) * 100, 100) : 0;
   return (
@@ -482,7 +685,7 @@ export default function NutriDash() {
   const [proteinPerKg, setProteinPerKg] = useState(stored.proteinPerKg ?? 2.0);
   const [fatPercent, setFatPercent] = useState(stored.fatPercent ?? 25);
 
-  const [foods, setFoods] = useState(stored.foods ?? FOOD_DB_INITIAL);
+  const [foods, setFoods] = useState(() => (stored.foods ?? FOOD_DB_INITIAL).map((f) => ({ ...f, category: foodCategory(f) })));
   const [mealTemplates, setMealTemplates] = useState(stored.mealTemplates ?? []); // {id, name, items}
   const [editGramsItem, setEditGramsItem] = useState(null); // {mealId, itemId}
   const [editGramsDraft, setEditGramsDraft] = useState("");
@@ -527,7 +730,10 @@ export default function NutriDash() {
   const [weightLogs, setWeightLogs] = useState(stored.weightLogs ?? []);
   const [weightDraft, setWeightDraft] = useState({ weight: "", unit: "kg" });
 
-  const [catalog, setCatalog] = useState(stored.catalog ?? DEFAULT_EXERCISE_CATALOG);
+  const [catalog, setCatalog] = useState(() => {
+    const savedCustom = (stored.catalog ?? []).filter((c) => c.isCustom);
+    return [...DEFAULT_EXERCISE_CATALOG, ...savedCustom.map((c) => ({ ...c, targets: c.targets ?? (c.muscleGroup ? t1(c.muscleGroup) : t1(MUSCLE_GROUPS[0])) }))];
+  });
   const [blocks, setBlocks] = useState(stored.blocks ?? []);
   const [weeks, setWeeks] = useState(stored.weeks ?? []);
   const [days, setDays] = useState(stored.days ?? []);
@@ -536,6 +742,8 @@ export default function NutriDash() {
 
   const [activeBlockId, setActiveBlockId] = useState(null);
   const [expandedWeekId, setExpandedWeekId] = useState(null);
+  const [mapScope, setMapScope] = useState("semana"); // 'semana' | 'bloque'
+  const [mapWeekId, setMapWeekId] = useState(null);
   const [selectedDayId, setSelectedDayId] = useState(null);
 
   const [showNewBlockModal, setShowNewBlockModal] = useState(false);
@@ -549,7 +757,7 @@ export default function NutriDash() {
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [variantDrafts, setVariantDrafts] = useState({});
   const [showCustomExerciseForm, setShowCustomExerciseForm] = useState(false);
-  const [customExerciseForm, setCustomExerciseForm] = useState({ name: "", muscleGroup: "" });
+  const [customExerciseForm, setCustomExerciseForm] = useState({ name: "", muscleGroup: MUSCLE_GROUPS[0] });
 
   const [setDrafts, setSetDrafts] = useState({});
 
@@ -702,6 +910,30 @@ export default function NutriDash() {
     return recSets.length ? recSets : null;
   }
 
+  /** Suma series efectivas por grupo muscular: primario = 1.0, secundario = 0.5 por serie. */
+  function getMuscleVolumeForDays(dayIds) {
+    const volume = {};
+    dayIds.forEach((dayId) => {
+      getExercisesForDay(dayId).forEach((ex) => {
+        const catalogEx = catalog.find((c) => c.id === ex.catalogExerciseId);
+        if (!catalogEx?.targets) return;
+        const setCount = getSetsForExercise(ex.id).length;
+        catalogEx.targets.forEach(({ group, role }) => {
+          const weight = role === "primary" ? 1 : SECONDARY_SET_WEIGHT;
+          volume[group] = (volume[group] || 0) + setCount * weight;
+        });
+      });
+    });
+    return volume;
+  }
+  function getMuscleVolumeForWeek(weekId) {
+    return getMuscleVolumeForDays(getDaysForWeek(weekId).map((d) => d.id));
+  }
+  function getMuscleVolumeForBlock(blockId) {
+    const dayIds = getWeeksForBlock(blockId).flatMap((w) => getDaysForWeek(w.id).map((d) => d.id));
+    return getMuscleVolumeForDays(dayIds);
+  }
+
   function addWeek(blockId) {
     const order = getWeeksForBlock(blockId).length;
     const week = { id: uid(), blockId, order, label: `Semana ${order + 1}`, clonedFromWeekId: null };
@@ -796,9 +1028,9 @@ export default function NutriDash() {
   function addCustomCatalogExercise() {
     const { name, muscleGroup } = customExerciseForm;
     if (!name.trim()) return;
-    const entry = { id: uid(), name: name.trim(), muscleGroup: muscleGroup.trim(), isCustom: true };
+    const entry = { id: uid(), name: name.trim(), targets: t1(muscleGroup), isCustom: true };
     setCatalog((prev) => [entry, ...prev]);
-    setCustomExerciseForm({ name: "", muscleGroup: "" });
+    setCustomExerciseForm({ name: "", muscleGroup: MUSCLE_GROUPS[0] });
     setShowCustomExerciseForm(false);
   }
 
@@ -998,7 +1230,7 @@ export default function NutriDash() {
 
           {/* -------- Calculadora de equivalencias -------- */}
           {(() => {
-            const eqFoods = foods.filter((f) => f.category === eqCategory);
+            const eqFoods = foods.filter((f) => foodCategory(f) === eqCategory);
             const originFood = eqFoods.find((f) => f.id === eqOriginId) ?? eqFoods[0] ?? null;
             const destFood = eqFoods.find((f) => f.id === eqDestId) ?? eqFoods.find((f) => f.id !== originFood?.id) ?? eqFoods[0] ?? null;
             const result = calcEquivalence(originFood, Number(eqOriginGrams), destFood, eqCategory);
@@ -1172,6 +1404,38 @@ export default function NutriDash() {
                 })}
 
                 <button onClick={() => addWeek(block.id)} style={dashedButtonStyle}><Plus size={16} /> Agregar semana</button>
+
+                {(() => {
+                  const currentMapWeekId = mapWeekId ?? blockWeeks[blockWeeks.length - 1]?.id ?? null;
+                  const volumeMap = mapScope === "bloque"
+                    ? getMuscleVolumeForBlock(block.id)
+                    : (currentMapWeekId ? getMuscleVolumeForWeek(currentMapWeekId) : {});
+                  return (
+                    <Panel>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                        <Activity size={15} color="var(--accent)" /> Mapa muscular
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                        <ToggleGroup options={[{ value: "semana", label: "Semana" }, { value: "bloque", label: "Bloque completo" }]} value={mapScope} onChange={setMapScope} />
+                      </div>
+                      {mapScope === "semana" && blockWeeks.length > 0 && (
+                        <select style={{ ...selectStyle, marginBottom: 12 }} value={currentMapWeekId ?? ""} onChange={(e) => setMapWeekId(e.target.value)}>
+                          {blockWeeks.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+                        </select>
+                      )}
+                      {blockWeeks.length === 0 ? (
+                        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Agrega una semana con días y ejercicios para ver tu volumen aquí.</div>
+                      ) : (
+                        <>
+                          <MuscleBodyMap volumeMap={volumeMap} />
+                          <div style={{ fontSize: 10.5, color: "var(--text-dim)", textAlign: "center", marginTop: 4 }}>
+                            Series efectivas (primario=1, secundario=0.5) · más color y brillo = más volumen (≥{VOLUME_CAP} = intensidad máxima)
+                          </div>
+                        </>
+                      )}
+                    </Panel>
+                  );
+                })()}
               </>
             );
           })()}
@@ -1215,7 +1479,7 @@ export default function NutriDash() {
                             onChange={(e) => updateExerciseVariant(ex.id, e.target.value)}
                             style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--text)", fontWeight: 700, fontSize: 14.5, padding: 0 }}
                           />
-                          {catalogEx && <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{catalogEx.name} · {catalogEx.muscleGroup}</div>}
+                          {catalogEx && <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{catalogEx.name} · {targetsLabel(catalogEx)}</div>}
                         </div>
                         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                           <button onClick={() => moveExercise(day.id, ex.id, -1)} disabled={i === 0} style={{ ...iconBtnStyle, opacity: i === 0 ? 0.35 : 1 }}><ArrowUp size={13} /></button>
@@ -1621,7 +1885,7 @@ export default function NutriDash() {
                 <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>
                   {c.name} {c.isCustom && <span style={{ fontSize: 9.5, color: "var(--accent2)", border: "1px solid var(--accent2)", borderRadius: 5, padding: "1px 5px", marginLeft: 6 }}>PROPIO</span>}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 8 }}>{c.muscleGroup}</div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 8 }}>{targetsLabel(c)}</div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <input
                     value={variantDrafts[c.id] ?? c.name}
@@ -1647,8 +1911,10 @@ export default function NutriDash() {
               <Field label="Nombre general">
                 <input style={selectStyle} value={customExerciseForm.name} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej. Hack squat" />
               </Field>
-              <Field label="Grupo muscular (opcional)">
-                <input style={selectStyle} value={customExerciseForm.muscleGroup} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, muscleGroup: e.target.value }))} placeholder="Ej. Pierna" />
+              <Field label="Grupo muscular">
+                <select style={selectStyle} value={customExerciseForm.muscleGroup} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, muscleGroup: e.target.value }))}>
+                  {MUSCLE_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
               </Field>
               <button onClick={addCustomCatalogExercise} style={{ ...primaryButtonStyle, background: "var(--accent2)" }}>
                 <Plus size={16} /> Guardar en el catálogo
