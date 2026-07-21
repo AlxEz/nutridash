@@ -458,20 +458,32 @@ function ModalShell({ title, onClose, children, wide }) {
 /* ---------------------------------------------------------
    APP PRINCIPAL
 --------------------------------------------------------- */
-export default function NutriDash() {
-  const [profile, setProfile] = useState({ sex: "M", age: 25, weight: 70, height: 170 });
-  const [steps, setSteps] = useState(6000);
-  const [gymDays, setGymDays] = useState(3);
-  const [activityMode, setActivityMode] = useState("avanzado");
-  const [generalActivityLevel, setGeneralActivityLevel] = useState("moderado");
-  const [goal, setGoal] = useState("mantenimiento");
-  const [deficitAmount, setDeficitAmount] = useState(500);
-  const [surplusAmount, setSurplusAmount] = useState(300);
-  const [proteinPerKg, setProteinPerKg] = useState(2.0);
-  const [fatPercent, setFatPercent] = useState(25);
+const STORAGE_KEY = "nutridash-data-v1";
+function loadStored() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
 
-  const [foods, setFoods] = useState(FOOD_DB_INITIAL);
-  const [mealTemplates, setMealTemplates] = useState([]); // {id, name, items}
+export default function NutriDash() {
+  const [stored] = useState(loadStored);
+
+  const [profile, setProfile] = useState(stored.profile ?? { sex: "M", age: 25, weight: 70, height: 170 });
+  const [steps, setSteps] = useState(stored.steps ?? 6000);
+  const [gymDays, setGymDays] = useState(stored.gymDays ?? 3);
+  const [activityMode, setActivityMode] = useState(stored.activityMode ?? "avanzado");
+  const [generalActivityLevel, setGeneralActivityLevel] = useState(stored.generalActivityLevel ?? "moderado");
+  const [goal, setGoal] = useState(stored.goal ?? "mantenimiento");
+  const [deficitAmount, setDeficitAmount] = useState(stored.deficitAmount ?? 500);
+  const [surplusAmount, setSurplusAmount] = useState(stored.surplusAmount ?? 300);
+  const [proteinPerKg, setProteinPerKg] = useState(stored.proteinPerKg ?? 2.0);
+  const [fatPercent, setFatPercent] = useState(stored.fatPercent ?? 25);
+
+  const [foods, setFoods] = useState(stored.foods ?? FOOD_DB_INITIAL);
+  const [mealTemplates, setMealTemplates] = useState(stored.mealTemplates ?? []); // {id, name, items}
   const [editGramsItem, setEditGramsItem] = useState(null); // {mealId, itemId}
   const [editGramsDraft, setEditGramsDraft] = useState("");
 
@@ -482,8 +494,8 @@ export default function NutriDash() {
   const [saveTemplateMealId, setSaveTemplateMealId] = useState(null);
   const [templateNameDraft, setTemplateNameDraft] = useState("");
   const [templatePickerMealId, setTemplatePickerMealId] = useState(null);
-  const [mealCount, setMealCount] = useState(3);
-  const [meals, setMeals] = useState(() => Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: `Comida ${i + 1}`, items: [] })));
+  const [mealCount, setMealCount] = useState(stored.mealCount ?? 3);
+  const [meals, setMeals] = useState(stored.meals ?? (() => Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: `Comida ${i + 1}`, items: [] }))));
 
   useEffect(() => {
     setMeals((prev) => {
@@ -509,18 +521,18 @@ export default function NutriDash() {
 
   /* ---- Fase 2: entrenamiento + Fase 3: navegación e identidad ---- */
   const [appView, setAppView] = useState("inicio"); // 'inicio' | 'perfil' | 'nutricion' | 'entrenamiento'
-  const [account, setAccount] = useState({ name: "", email: "", password: "" });
+  const [account, setAccount] = useState(stored.account ?? { name: "", email: "", password: "" });
 
 
-  const [weightLogs, setWeightLogs] = useState([]);
+  const [weightLogs, setWeightLogs] = useState(stored.weightLogs ?? []);
   const [weightDraft, setWeightDraft] = useState({ weight: "", unit: "kg" });
 
-  const [catalog, setCatalog] = useState(DEFAULT_EXERCISE_CATALOG);
-  const [blocks, setBlocks] = useState([]);
-  const [weeks, setWeeks] = useState([]);
-  const [days, setDays] = useState([]);
-  const [dayExercises, setDayExercises] = useState([]);
-  const [sets, setSets] = useState([]);
+  const [catalog, setCatalog] = useState(stored.catalog ?? DEFAULT_EXERCISE_CATALOG);
+  const [blocks, setBlocks] = useState(stored.blocks ?? []);
+  const [weeks, setWeeks] = useState(stored.weeks ?? []);
+  const [days, setDays] = useState(stored.days ?? []);
+  const [dayExercises, setDayExercises] = useState(stored.dayExercises ?? []);
+  const [sets, setSets] = useState(stored.sets ?? []);
 
   const [activeBlockId, setActiveBlockId] = useState(null);
   const [expandedWeekId, setExpandedWeekId] = useState(null);
@@ -828,6 +840,17 @@ export default function NutriDash() {
   }
 
   const filteredCatalog = catalog.filter((e) => e.name.toLowerCase().includes(exerciseSearch.toLowerCase()));
+
+  useEffect(() => {
+    const data = {
+      profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
+      foods, mealTemplates, mealCount, meals, account, weightLogs,
+      catalog, blocks, weeks, days, dayExercises, sets,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+  }, [profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
+      foods, mealTemplates, mealCount, meals, account, weightLogs,
+      catalog, blocks, weeks, days, dayExercises, sets]);
 
   return (
     <div style={{
