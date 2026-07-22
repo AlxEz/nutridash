@@ -2123,5 +2123,3 @@ export default function NutriDash() {
     </div>
   );
 }
-}
-
