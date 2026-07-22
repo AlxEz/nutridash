@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity,
+  UtensilsCrossed, Activity, Ruler,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -171,6 +171,37 @@ const MUSCLE_GROUPS = [
   "Pecho", "Hombro", "Bíceps", "Tríceps", "Abdomen",
 ];
 
+/* ---- Medidas corporales: campo, etiqueta y frecuencia recomendada (días) ---- */
+const MEASUREMENT_FIELDS = [
+  { key: "pecho", label: "Pecho", freqDays: 14 },
+  { key: "cintura", label: "Cintura (ombligo)", freqDays: 14 },
+  { key: "hombros", label: "Hombros", freqDays: 24 },
+  { key: "cadera", label: "Cadera/Glúteos", freqDays: 24 },
+  { key: "bicepsIzq", label: "Bíceps Izq.", freqDays: 24 },
+  { key: "bicepsDer", label: "Bíceps Der.", freqDays: 24 },
+  { key: "musloIzq", label: "Muslo Izq.", freqDays: 24 },
+  { key: "musloDer", label: "Muslo Der.", freqDays: 24 },
+  { key: "pantorrillas", label: "Pantorrillas", freqDays: 24 },
+];
+function daysSince(dateStr) {
+  return Math.floor((Date.now() - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000);
+}
+
+/* ---- Guía visual de puntos de medición ---- */
+const GUIDE_POINTS = [
+  { key: "hombros", label: "Hombros", view: "front", instruction: "Rodea la parte más ancha, pasando por encima de ambos deltoides.", markers: [{ x1: 30, y1: 50, x2: 130, y2: 50 }] },
+  { key: "pecho", label: "Pecho", view: "front", instruction: "Cinta horizontal a la altura de los pezones, respiración normal.", markers: [{ x1: 55, y1: 70, x2: 105, y2: 70 }] },
+  { key: "biceps", label: "Bíceps", view: "front", instruction: "Brazo flexionado a 90°, en el punto más ancho contraído.", markers: [{ cx: 26, cy: 95 }, { cx: 134, cy: 95 }] },
+  { key: "cintura", label: "Cintura", view: "front", instruction: "A la altura del ombligo, postura relajada, sin contraer.", markers: [{ x1: 52, y1: 120, x2: 108, y2: 120 }] },
+  { key: "cadera", label: "Cadera/Glúteos", view: "back", instruction: "En el punto más ancho de los glúteos, pies juntos.", markers: [{ x1: 55, y1: 178, x2: 105, y2: 178 }] },
+  { key: "muslos", label: "Muslos", view: "front", instruction: "10 cm arriba de la rótula, pierna relajada sin flexionar.", markers: [{ cx: 63, cy: 230 }, { cx: 97, cy: 230 }] },
+  { key: "pantorrillas", label: "Pantorrillas", view: "back", instruction: "Parte más ancha, de pie con el peso distribuido parejo.", markers: [{ cx: 58, cy: 310 }, { cx: 102, cy: 310 }] },
+];
+const FIELD_TO_GUIDE = {
+  hombros: "hombros", pecho: "pecho", cintura: "cintura", cadera: "cadera",
+  bicepsIzq: "biceps", bicepsDer: "biceps", musloIzq: "muslos", musloDer: "muslos", pantorrillas: "pantorrillas",
+};
+
 const backBtnStyle = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 9, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 const iconBtnStyle = { background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 7, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-dim)" };
 const dashedButtonStyle = { width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "#0D0B14", color: "var(--accent)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 };
@@ -322,44 +353,47 @@ function CalorieGauge({ consumed, target }) {
 }
 
 /* ---------------------------------------------------------
-   GRÁFICA DE PESO CORPORAL
+   GRÁFICA GENÉRICA — usada para peso y cada medida corporal
 --------------------------------------------------------- */
-function WeightChart({ logs }) {
-  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+function SimpleTrendChart({ points, unit, gid }) {
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
   if (sorted.length < 2) {
-    return <div style={{ fontSize: 11.5, color: "var(--text-dim)", padding: "10px 0" }}>Registra al menos 2 días para ver tu tendencia aquí.</div>;
+    return <div style={{ fontSize: 11.5, color: "var(--text-dim)", padding: "10px 0" }}>Registra al menos 2 fechas para ver la tendencia.</div>;
   }
-  const kg = sorted.map((w) => (w.unit === "lb" ? w.weight * 0.453592 : w.weight));
-  const min = Math.min(...kg), max = Math.max(...kg);
+  const vals = sorted.map((p) => p.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
   const pad = (max - min) * 0.2 || 1;
   const yMin = min - pad, yMax = max + pad;
-  const W = 300, H = 110, mX = 8, mY = 12;
-  const pts = kg.map((w, i) => [
+  const W = 300, H = 100, mX = 8, mY = 10;
+  const pts = vals.map((v, i) => [
     mX + (i / (sorted.length - 1)) * (W - mX * 2),
-    mY + (1 - (w - yMin) / (yMax - yMin)) * (H - mY * 2),
+    mY + (1 - (v - yMin) / (yMax - yMin)) * (H - mY * 2),
   ]);
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }}>
         <defs>
-          <filter id="weightGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <filter id={gid} x="-30%" y="-30%" width="160%" height="160%">
             <feGaussianBlur stdDeviation="2" result="b" />
             <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
-        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#weightGlow)" />
+        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter={`url(#${gid})`} />
         {pts.map((p, i) => (
           <circle key={i} cx={p[0]} cy={p[1]} r={i === pts.length - 1 ? 4 : 2.5} fill={i === pts.length - 1 ? "var(--accent)" : "var(--accent2)"} />
         ))}
       </svg>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "var(--text-dim)", marginTop: 4 }}>
-        <span>{formatDateEs(sorted[0].date)} · {round(min, 1)}kg</span>
-        <span>{formatDateEs(sorted[sorted.length - 1].date)} · {round(max, 1)}kg</span>
+        <span>{formatDateEs(sorted[0].date)} · {round(min, 1)}{unit}</span>
+        <span>{formatDateEs(sorted[sorted.length - 1].date)} · {round(max, 1)}{unit}</span>
       </div>
     </div>
   );
+}
+function WeightChart({ logs }) {
+  const kgPoints = logs.map((w) => ({ date: w.date, value: w.unit === "lb" ? w.weight * 0.453592 : w.weight }));
+  return <SimpleTrendChart points={kgPoints} unit="kg" gid="weightGlow" />;
 }
 
 /* ---------------------------------------------------------
@@ -495,6 +529,48 @@ function MuscleBodyMap({ volumeMap }) {
       </defs>
       <BodyFigure zones={withCounts(FRONT_ZONES)} offsetX={0} title="FRENTE" />
       <BodyFigure zones={withCounts(BACK_ZONES)} offsetX={180} title="ESPALDA" />
+    </svg>
+  );
+}
+
+/* ---------------------------------------------------------
+   GUÍA VISUAL DE PUNTOS DE MEDICIÓN — frente + espalda
+--------------------------------------------------------- */
+function GuideMarker({ point, marker, active, onSelect }) {
+  const color = active ? "var(--accent)" : "#5A5468";
+  const props = { onClick: () => onSelect(point.key), style: { cursor: "pointer" } };
+  if (marker.cx !== undefined) {
+    return (
+      <g {...props}>
+        {active && <circle cx={marker.cx} cy={marker.cy} r="10" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.5" />}
+        <circle cx={marker.cx} cy={marker.cy} r="5" fill={color} stroke="#07060B" strokeWidth="1.5" />
+      </g>
+    );
+  }
+  return (
+    <g {...props}>
+      <line x1={marker.x1} y1={marker.y1} x2={marker.x2} y2={marker.y2} stroke={color} strokeWidth={active ? 3 : 2} strokeDasharray={active ? "0" : "3,3"} strokeLinecap="round" />
+      <circle cx={marker.x1} cy={marker.y1} r="3.5" fill={color} />
+      <circle cx={marker.x2} cy={marker.y2} r="3.5" fill={color} />
+    </g>
+  );
+}
+
+function MeasurementGuideMap({ activeKey, onSelect }) {
+  const front = GUIDE_POINTS.filter((p) => p.view === "front");
+  const back = GUIDE_POINTS.filter((p) => p.view === "back");
+  return (
+    <svg viewBox="0 0 340 385" style={{ width: "100%", display: "block" }}>
+      <g>
+        <BodySilhouette />
+        {front.map((p) => p.markers.map((m, i) => <GuideMarker key={`${p.key}-${i}`} point={p} marker={m} active={activeKey === p.key} onSelect={onSelect} />))}
+        <text x="80" y="372" textAnchor="middle" fontSize="11" fill="#6B7488" fontFamily="'Rajdhani', sans-serif" fontWeight="700" letterSpacing="1">FRENTE</text>
+      </g>
+      <g transform="translate(180,0)">
+        <BodySilhouette />
+        {back.map((p) => p.markers.map((m, i) => <GuideMarker key={`${p.key}-${i}`} point={p} marker={m} active={activeKey === p.key} onSelect={onSelect} />))}
+        <text x="80" y="372" textAnchor="middle" fontSize="11" fill="#6B7488" fontFamily="'Rajdhani', sans-serif" fontWeight="700" letterSpacing="1">ESPALDA</text>
+      </g>
     </svg>
   );
 }
@@ -730,6 +806,12 @@ export default function NutriDash() {
   const [weightLogs, setWeightLogs] = useState(stored.weightLogs ?? []);
   const [weightDraft, setWeightDraft] = useState({ weight: "", unit: "kg" });
 
+  const [measurementLogs, setMeasurementLogs] = useState(stored.measurementLogs ?? []); // {id, date, unit, values:{}}
+  const [measurementUnit, setMeasurementUnit] = useState("cm");
+  const [measurementDraft, setMeasurementDraft] = useState({});
+  const [measurementChartField, setMeasurementChartField] = useState(MEASUREMENT_FIELDS[0].key);
+  const [activeGuidePoint, setActiveGuidePoint] = useState("cintura");
+
   const [catalog, setCatalog] = useState(() => {
     const savedCustom = (stored.catalog ?? []).filter((c) => c.isCustom);
     return [...DEFAULT_EXERCISE_CATALOG, ...savedCustom.map((c) => ({ ...c, targets: c.targets ?? (c.muscleGroup ? t1(c.muscleGroup) : t1(MUSCLE_GROUPS[0])) }))];
@@ -875,6 +957,30 @@ export default function NutriDash() {
       return [...prev, { id: uid(), date, weight: w, unit: weightDraft.unit }];
     });
     setWeightDraft((d) => ({ ...d, weight: "" }));
+  }
+
+  /** Guarda las medidas ingresadas para hoy, fusionando con lo ya registrado ese día. */
+  function saveMeasurements() {
+    const values = {};
+    MEASUREMENT_FIELDS.forEach(({ key }) => {
+      if (measurementDraft[key] !== undefined && measurementDraft[key] !== "") values[key] = Number(measurementDraft[key]);
+    });
+    if (Object.keys(values).length === 0) return;
+    const date = todayISO();
+    setMeasurementLogs((prev) => {
+      const exists = prev.find((x) => x.date === date);
+      if (exists) return prev.map((x) => (x.date === date ? { ...x, unit: measurementUnit, values: { ...x.values, ...values } } : x));
+      return [...prev, { id: uid(), date, unit: measurementUnit, values }];
+    });
+    setMeasurementDraft({});
+  }
+
+  /** Última fecha registrada para un campo + si ya toca volver a medir. */
+  function measurementStatus(key, freqDays) {
+    const withField = measurementLogs.filter((m) => m.values[key] !== undefined).sort((a, b) => b.date.localeCompare(a.date));
+    if (withField.length === 0) return { lastDate: null, days: null, due: true };
+    const days = daysSince(withField[0].date);
+    return { lastDate: withField[0].date, days, due: days >= freqDays };
   }
 
   function createBlock() {
@@ -1076,12 +1182,12 @@ export default function NutriDash() {
   useEffect(() => {
     const data = {
       profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs,
       catalog, blocks, weeks, days, dayExercises, sets,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
   }, [profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs,
       catalog, blocks, weeks, days, dayExercises, sets]);
 
   return (
@@ -1117,6 +1223,7 @@ export default function NutriDash() {
                 {appView === "perfil" && "Tu perfil"}
                 {appView === "nutricion" && "Tablero de nutrición"}
                 {appView === "entrenamiento" && "Tablero de entrenamiento"}
+                {appView === "progreso" && "Progreso corporal"}
               </div>
             </div>
           </div>
@@ -1126,9 +1233,10 @@ export default function NutriDash() {
         {appView === "inicio" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
-            { key: "perfil", title: "Perfil", sub: "Tus datos y seguimiento de peso", icon: User },
+            { key: "perfil", title: "Perfil", sub: "Tus datos y objetivo", icon: User },
             { key: "nutricion", title: "Nutrición", sub: "Calorías, macros y comidas", icon: UtensilsCrossed },
             { key: "entrenamiento", title: "Entrenamiento", sub: "Bloques, semanas y ejercicios", icon: Dumbbell },
+            { key: "progreso", title: "Progreso Corporal", sub: "Peso y medidas a lo largo del tiempo", icon: Ruler },
           ].map(({ key, title, sub, icon: Icon }) => (
             <button
               key={key}
@@ -1576,41 +1684,6 @@ export default function NutriDash() {
           </Panel>
 
           <Panel>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 7 }}>
-              <Scale size={15} color="var(--accent)" /> Seguimiento de peso corporal
-            </div>
-            <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
-              {latestWeightKg
-                ? <>Última entrada: <span style={{ color: "var(--accent2)" }}>{round(latestWeightKg, 1)}kg</span>. Es solo de consulta, no afecta tus cálculos de calorías (usa el "Peso de Cálculo" de arriba).</>
-                : "Aquí llevas tu tendencia de peso. Es solo de consulta, no afecta tus cálculos de calorías (usa el \"Peso de Cálculo\" de arriba)."}
-            </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12 }}>
-              <input type="number" placeholder="Ej. 78.4" value={weightDraft.weight} onChange={(e) => setWeightDraft((d) => ({ ...d, weight: e.target.value }))} style={{ ...inputStyle, flex: 1 }} />
-              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", flexShrink: 0 }}>
-                {["kg", "lb"].map((u) => (
-                  <button key={u} onClick={() => setWeightDraft((d) => ({ ...d, unit: u }))} style={{ padding: "9px 10px", fontSize: 12, border: "none", cursor: "pointer", background: weightDraft.unit === u ? "var(--accent)" : "var(--panel2)", color: weightDraft.unit === u ? "#07060B" : "var(--text-dim)" }}>{u}</button>
-                ))}
-              </div>
-              <button onClick={logTodayWeight} style={{ background: "var(--accent)", border: "none", borderRadius: 8, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                <Plus size={18} color="#07060B" />
-              </button>
-            </div>
-
-            <WeightChart logs={weightLogs} />
-
-            {weightLogs.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                {[...weightLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6).map((w) => (
-                  <div key={w.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 12.5 }}>
-                    <span style={{ color: "var(--text-dim)" }}>{formatDateEs(w.date)}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--text)" }}>{w.weight} {w.unit}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-
-          <Panel>
             <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 4, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Movimiento diario real</div>
             <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>Elige qué tan detallado quieres calcular tu gasto por actividad.</div>
 
@@ -1700,6 +1773,130 @@ export default function NutriDash() {
                 <span style={{ color: "var(--fat)" }}>G {round(targetFat)}g</span>
               </div>
             </div>
+          </Panel>
+        </div>
+        )}
+
+        {/* -------------------- PANTALLA: PROGRESO CORPORAL -------------------- */}
+        {appView === "progreso" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Panel style={{ border: "1px solid var(--accent2)44" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 14, marginBottom: 8, color: "var(--accent2)" }}>
+              <Lightbulb size={15} /> ¿Cada cuánto medirme?
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)", lineHeight: 1.7 }}>
+              <strong style={{ color: "var(--text)" }}>Peso</strong>: diario, en ayunas.{" "}
+              <strong style={{ color: "var(--text)" }}>Cintura y pecho</strong>: cada 2 semanas.{" "}
+              <strong style={{ color: "var(--text)" }}>Brazos, piernas y demás</strong>: cada 3-4 semanas — medir muy seguido solo genera ansiedad por cambios que ahí son lentos.
+            </div>
+          </Panel>
+
+          <Panel>
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 7 }}>
+              <Scale size={15} color="var(--accent)" /> Peso corporal
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12 }}>
+              <input type="number" placeholder="Ej. 78.4" value={weightDraft.weight} onChange={(e) => setWeightDraft((d) => ({ ...d, weight: e.target.value }))} style={{ ...inputStyle, flex: 1 }} />
+              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", flexShrink: 0 }}>
+                {["kg", "lb"].map((u) => (
+                  <button key={u} onClick={() => setWeightDraft((d) => ({ ...d, unit: u }))} style={{ padding: "9px 10px", fontSize: 12, border: "none", cursor: "pointer", background: weightDraft.unit === u ? "var(--accent)" : "var(--panel2)", color: weightDraft.unit === u ? "#07060B" : "var(--text-dim)" }}>{u}</button>
+                ))}
+              </div>
+              <button onClick={logTodayWeight} style={{ background: "var(--accent)", border: "none", borderRadius: 8, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                <Plus size={18} color="#07060B" />
+              </button>
+            </div>
+            <WeightChart logs={weightLogs} />
+            {weightLogs.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                {[...weightLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6).map((w) => (
+                  <div key={w.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 12.5 }}>
+                    <span style={{ color: "var(--text-dim)" }}>{formatDateEs(w.date)}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--text)" }}>{w.weight} {w.unit}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 7 }}>
+                <Ruler size={15} color="var(--accent)" /> Medidas corporales
+              </div>
+              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden" }}>
+                {["cm", "in"].map((u) => (
+                  <button key={u} onClick={() => setMeasurementUnit(u)} style={{ padding: "6px 9px", fontSize: 11, border: "none", cursor: "pointer", background: measurementUnit === u ? "var(--accent)" : "var(--panel2)", color: measurementUnit === u ? "#07060B" : "var(--text-dim)" }}>{u}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              {MEASUREMENT_FIELDS.map(({ key, label, freqDays }) => {
+                const status = measurementStatus(key, freqDays);
+                const active = activeGuidePoint === FIELD_TO_GUIDE[key];
+                return (
+                  <Field key={key} label={label}>
+                    <input
+                      type="number"
+                      placeholder={measurementUnit}
+                      value={measurementDraft[key] ?? ""}
+                      onChange={(e) => setMeasurementDraft((d) => ({ ...d, [key]: e.target.value }))}
+                      onFocus={() => setActiveGuidePoint(FIELD_TO_GUIDE[key])}
+                      style={{ ...inputStyle, borderColor: active ? "var(--accent)" : "var(--border)" }}
+                    />
+                    <div style={{ fontSize: 9.5, marginTop: 3, color: status.due ? "var(--fat)" : "var(--text-dim)" }}>
+                      {status.lastDate ? (status.due ? `¡Toca medir! (hace ${status.days}d)` : `Hace ${status.days}d`) : "Nunca medido"}
+                    </div>
+                  </Field>
+                );
+              })}
+            </div>
+            <button onClick={saveMeasurements} style={primaryButtonStyle}><Plus size={16} /> Guardar medidas de hoy</button>
+
+            {/* -------- Guía visual de puntos de medición -------- */}
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Dónde medir cada zona</div>
+              <MeasurementGuideMap activeKey={activeGuidePoint} onSelect={setActiveGuidePoint} />
+              {(() => {
+                const gp = GUIDE_POINTS.find((p) => p.key === activeGuidePoint);
+                if (!gp) return null;
+                return (
+                  <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--accent)44" }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "var(--accent)", marginBottom: 3 }}>{gp.label}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5 }}>{gp.instruction}</div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {measurementLogs.length > 0 && (
+              <>
+                <div style={{ marginTop: 16, marginBottom: 8 }}>
+                  <select style={selectStyle} value={measurementChartField} onChange={(e) => setMeasurementChartField(e.target.value)}>
+                    {MEASUREMENT_FIELDS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  </select>
+                </div>
+                <SimpleTrendChart
+                  points={measurementLogs.filter((m) => m.values[measurementChartField] !== undefined).map((m) => ({ date: m.date, value: m.values[measurementChartField] }))}
+                  unit={measurementUnit}
+                  gid="measureGlow"
+                />
+
+                <div style={{ marginTop: 14 }}>
+                  {[...measurementLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((m) => (
+                    <div key={m.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 4 }}>{formatDateEs(m.date)}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {Object.entries(m.values).map(([k, v]) => (
+                          <span key={k}>{MEASUREMENT_FIELDS.find((f) => f.key === k)?.label}: {v}{m.unit}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </Panel>
         </div>
         )}
@@ -1925,5 +2122,6 @@ export default function NutriDash() {
       )}
     </div>
   );
+}
 }
 
