@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -187,6 +187,19 @@ function daysSince(dateStr) {
   return Math.floor((Date.now() - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000);
 }
 
+/* ---- Frecuencia de control elegida por el usuario para "próxima medición" ---- */
+const FREQ_OPTIONS = [
+  { value: "1s", label: "1 semana", days: 7 },
+  { value: "2s", label: "2 semanas", days: 14 },
+  { value: "3s", label: "3 semanas", days: 21 },
+  { value: "1m", label: "1 mes", days: 30 },
+];
+function calcNextMeasurementDate(lastDate, freqValue) {
+  if (!lastDate) return null;
+  const freqDays = FREQ_OPTIONS.find((f) => f.value === freqValue)?.days ?? 14;
+  return addDaysToDate(lastDate, freqDays);
+}
+
 /* ---- Guía visual de puntos de medición ---- */
 const GUIDE_POINTS = [
   { key: "hombros", label: "Hombros", view: "front", instruction: "Rodea la parte más ancha, pasando por encima de ambos deltoides.", markers: [{ x1: 30, y1: 50, x2: 130, y2: 50 }] },
@@ -296,7 +309,7 @@ function CalorieGauge({ consumed, target }) {
   if (pct >= 100 && pct < 110) needleColor = "var(--accent)";
   if (pct >= 110) needleColor = "var(--danger)";
 
-  const ticks = [0, 25, 50, 75, 100, 120];
+  const ticks = [25, 50, 75, 100];
   const arcPoint = (p) => {
     const a = 180 - (Math.min(p, gaugeMax) / gaugeMax) * 180;
     const r = (a * Math.PI) / 180;
@@ -329,11 +342,10 @@ function CalorieGauge({ consumed, target }) {
           const x1 = cx + 100 * Math.cos(r), y1 = cy - 100 * Math.sin(r);
           const x2 = cx + 112 * Math.cos(r), y2 = cy - 112 * Math.sin(r);
           const lx = cx + 88 * Math.cos(r), ly = cy - 88 * Math.sin(r);
-          const kcalAtTick = Math.round((t / 100) * target);
           return (
             <g key={t}>
               <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#4B5468" strokeWidth="2" />
-              <text x={lx} y={ly} fill="#6B7488" fontSize="9" fontFamily="'JetBrains Mono', monospace" textAnchor="middle" dominantBaseline="middle">{kcalAtTick}</text>
+              <text x={lx} y={ly} fill="#6B7488" fontSize="9" fontFamily="'JetBrains Mono', monospace" textAnchor="middle" dominantBaseline="middle">{t}%</text>
             </g>
           );
         })}
@@ -774,21 +786,25 @@ export default function NutriDash() {
   const [templateNameDraft, setTemplateNameDraft] = useState("");
   const [templatePickerMealId, setTemplatePickerMealId] = useState(null);
   const [mealCount, setMealCount] = useState(stored.mealCount ?? 3);
-  const [meals, setMeals] = useState(stored.meals ?? (() => Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: `Comida ${i + 1}`, items: [] }))));
+  const [meals, setMeals] = useState(stored.meals ?? (() => Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: `Comida ${i + 1}`, items: [], completed: false }))));
+  const [nutritionDate, setNutritionDate] = useState(stored.nutritionDate ?? todayISO());
+  const [nutritionHistory, setNutritionHistory] = useState(stored.nutritionHistory ?? []); // {date, meals, totals}
+  const [historyOpenDate, setHistoryOpenDate] = useState(null);
 
   useEffect(() => {
     setMeals((prev) => {
       if (mealCount === prev.length) return prev;
       if (mealCount > prev.length) {
-        const extra = Array.from({ length: mealCount - prev.length }, (_, i) => ({ id: uid(), name: `Comida ${prev.length + i + 1}`, items: [] }));
+        const extra = Array.from({ length: mealCount - prev.length }, (_, i) => ({ id: uid(), name: `Comida ${prev.length + i + 1}`, items: [], completed: false }));
         return [...prev, ...extra];
       }
       return prev.slice(0, mealCount);
     });
   }, [mealCount]);
 
-
-
+  function toggleMealCompleted(mealId) {
+    setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, completed: !m.completed } : m)));
+  }
 
   const [pickerMeal, setPickerMeal] = useState(null);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -808,6 +824,7 @@ export default function NutriDash() {
 
   const [measurementLogs, setMeasurementLogs] = useState(stored.measurementLogs ?? []); // {id, date, unit, values:{}}
   const [measurementUnit, setMeasurementUnit] = useState("cm");
+  const [measurementFreq, setMeasurementFreq] = useState(stored.measurementFreq ?? "2s");
   const [measurementDraft, setMeasurementDraft] = useState({});
   const [measurementChartField, setMeasurementChartField] = useState(MEASUREMENT_FIELDS[0].key);
   const [activeGuidePoint, setActiveGuidePoint] = useState("cintura");
@@ -830,10 +847,19 @@ export default function NutriDash() {
 
   const [showNewBlockModal, setShowNewBlockModal] = useState(false);
   const [newBlockForm, setNewBlockForm] = useState({ name: "", startDate: todayISO(), endDate: "", goal: "mantenimiento" });
+  const [editBlockId, setEditBlockId] = useState(null);
+  const [editBlockForm, setEditBlockForm] = useState({ name: "", startDate: "", endDate: "" });
+
+  const [newWeekBlockId, setNewWeekBlockId] = useState(null);
+  const [newWeekName, setNewWeekName] = useState("");
+  const [duplicateWeekId, setDuplicateWeekId] = useState(null);
+  const [duplicateWeekName, setDuplicateWeekName] = useState("");
 
   const [addDayWeekId, setAddDayWeekId] = useState(null);
   const [addDayDate, setAddDayDate] = useState(todayISO());
   const [addDayName, setAddDayName] = useState("");
+  const [editDayItem, setEditDayItem] = useState(null);
+  const [editDayDraft, setEditDayDraft] = useState({ name: "", date: "" });
 
   const [exercisePickerDayId, setExercisePickerDayId] = useState(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
@@ -867,6 +893,20 @@ export default function NutriDash() {
     meals.forEach((meal) => meal.items.forEach((it) => { kcal += it.kcal; p += it.p; c += it.c; f += it.f; }));
     return { kcal, p, c, f };
   }, [meals]);
+
+  /** Reseteo diario: si cambió la fecha, archiva el día anterior a nutritionHistory y limpia el checklist/comidas de hoy. */
+  useEffect(() => {
+    function checkDailyReset() {
+      const today = todayISO();
+      if (nutritionDate === today) return;
+      setNutritionHistory((prev) => [...prev, { date: nutritionDate, meals, totals }]);
+      setMeals((prev) => prev.map((m) => ({ ...m, items: [], completed: false })));
+      setNutritionDate(today);
+    }
+    checkDailyReset();
+    const interval = setInterval(checkDailyReset, 60000);
+    return () => clearInterval(interval);
+  }, [nutritionDate, meals, totals]);
 
   function removeFromMeal(mealId, itemId) {
     setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, items: m.items.filter((i) => i.id !== itemId) } : m)));
@@ -985,12 +1025,33 @@ export default function NutriDash() {
 
   function createBlock() {
     const { name, startDate, endDate, goal } = newBlockForm;
-    if (!name.trim() || !startDate || !endDate) return;
-    const block = { id: uid(), name: name.trim(), startDate, endDate, goal };
+    if (!name.trim() || !startDate) return;
+    const block = { id: uid(), name: name.trim(), startDate, endDate: endDate || null, goal };
     setBlocks((prev) => [...prev, block]);
     setActiveBlockId(block.id);
     setShowNewBlockModal(false);
     setNewBlockForm({ name: "", startDate: todayISO(), endDate: "", goal: "mantenimiento" });
+  }
+
+  function updateBlock(blockId, fields) {
+    setBlocks((prev) => prev.map((b) => (b.id === blockId ? { ...b, ...fields } : b)));
+  }
+  function confirmEditBlock() {
+    if (!editBlockId || !editBlockForm.name.trim() || !editBlockForm.startDate) return;
+    updateBlock(editBlockId, { name: editBlockForm.name.trim(), startDate: editBlockForm.startDate, endDate: editBlockForm.endDate || null });
+    setEditBlockId(null);
+  }
+  function confirmNewWeek() {
+    if (!newWeekBlockId) return;
+    addWeek(newWeekBlockId, newWeekName);
+    setNewWeekBlockId(null);
+    setNewWeekName("");
+  }
+  function confirmDuplicateWeek() {
+    if (!duplicateWeekId) return;
+    duplicateWeek(duplicateWeekId, duplicateWeekName);
+    setDuplicateWeekId(null);
+    setDuplicateWeekName("");
   }
 
   function updateBlockGoal(blockId, newGoal) {
@@ -1040,11 +1101,33 @@ export default function NutriDash() {
     return getMuscleVolumeForDays(dayIds);
   }
 
-  function addWeek(blockId) {
+  /** Día de hoy si tiene rutina, si no el próximo día futuro con rutina (de cualquier bloque). */
+  function getNextWorkoutDay() {
+    const today = todayISO();
+    const todayDay = days.find((d) => d.date === today);
+    if (todayDay) return { day: todayDay, when: "Hoy" };
+    const future = [...days].filter((d) => d.date > today).sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (!future) return null;
+    const when = future.date === addDaysToDate(today, 1) ? "Mañana" : formatDateEs(future.date);
+    return { day: future, when };
+  }
+
+  function addWeek(blockId, name) {
     const order = getWeeksForBlock(blockId).length;
-    const week = { id: uid(), blockId, order, label: `Semana ${order + 1}`, clonedFromWeekId: null };
+    const week = { id: uid(), blockId, order, label: (name || "").trim() || `Semana ${order + 1}`, clonedFromWeekId: null };
     setWeeks((prev) => [...prev, week]);
     setExpandedWeekId(week.id);
+  }
+
+  /** Elimina una semana completa junto con sus días, ejercicios y series. */
+  function removeWeek(weekId) {
+    const dayIds = getDaysForWeek(weekId).map((d) => d.id);
+    const exIds = dayExercises.filter((e) => dayIds.includes(e.dayId)).map((e) => e.id);
+    setWeeks((prev) => prev.filter((w) => w.id !== weekId));
+    setDays((prev) => prev.filter((d) => d.weekId !== weekId));
+    setDayExercises((prev) => prev.filter((e) => !dayIds.includes(e.dayId)));
+    setSets((prev) => prev.filter((s) => !exIds.includes(s.dayExerciseId)));
+    if (expandedWeekId === weekId) setExpandedWeekId(null);
   }
 
   /**
@@ -1054,12 +1137,12 @@ export default function NutriDash() {
    * mostrar el "récord de la semana pasada" sin importar cómo se
    * reordene o edite después.
    */
-  function duplicateWeek(weekId) {
+  function duplicateWeek(weekId, name) {
     const sourceWeek = weeks.find((w) => w.id === weekId);
     if (!sourceWeek) return;
     const sourceDays = getDaysForWeek(weekId);
     const newOrder = getWeeksForBlock(sourceWeek.blockId).length;
-    const newWeek = { id: uid(), blockId: sourceWeek.blockId, order: newOrder, label: `Semana ${newOrder + 1}`, clonedFromWeekId: sourceWeek.id };
+    const newWeek = { id: uid(), blockId: sourceWeek.blockId, order: newOrder, label: (name || "").trim() || `Semana ${newOrder + 1}`, clonedFromWeekId: sourceWeek.id };
 
     const newDays = [];
     const newDayExercises = [];
@@ -1088,14 +1171,6 @@ export default function NutriDash() {
   function confirmAddDay() {
     if (!addDayWeekId || !addDayDate) return;
     const order = getDaysForWeek(addDayWeekId).length;
-    const day = { id: uid(), weekId: addDayWeekId, date: addDayDate, order };
-    setDays((prev) => [...prev, day]);
-    setAddDayWeekId(null);
-  }
-
-  function confirmAddDay() {
-    if (!addDayWeekId || !addDayDate) return;
-    const order = getDaysForWeek(addDayWeekId).length;
     const day = { id: uid(), weekId: addDayWeekId, date: addDayDate, order, name: addDayName.trim() || `Día ${order + 1}` };
     setDays((prev) => [...prev, day]);
     setAddDayWeekId(null);
@@ -1104,6 +1179,14 @@ export default function NutriDash() {
 
   function renameDay(dayId, name) {
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, name } : d)));
+  }
+  function editDay(dayId, { name, date }) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, name, date } : d)));
+  }
+  function confirmEditDay() {
+    if (!editDayItem) return;
+    editDay(editDayItem.dayId, editDayDraft);
+    setEditDayItem(null);
   }
 
   /** Elimina un día completo junto con sus ejercicios y series. */
@@ -1182,12 +1265,14 @@ export default function NutriDash() {
   useEffect(() => {
     const data = {
       profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq,
+      nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
   }, [profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq,
+      nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets]);
 
   return (
@@ -1232,6 +1317,47 @@ export default function NutriDash() {
         {/* -------------------- PANTALLA: INICIO -------------------- */}
         {appView === "inicio" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {(() => {
+            const kcalLeft = Math.max(targetCalories - totals.kcal, 0);
+            const pLeft = Math.max(targetProtein - totals.p, 0);
+            const cLeft = Math.max(targetCarbs - totals.c, 0);
+            const overBudget = totals.kcal > targetCalories;
+            const mealsDone = meals.filter((m) => m.completed).length;
+            const nextWorkout = getNextWorkoutDay();
+            return (
+              <>
+                <Panel>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                    <UtensilsCrossed size={14} color="var(--accent)" /> Hoy en nutrición
+                  </div>
+                  {overBudget ? (
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
+                  ) : (
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>
+                      Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> · <span style={{ color: "var(--protein)" }}>{round(pLeft)}g P</span> · <span style={{ color: "var(--carbs)" }}>{round(cLeft)}g C</span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
+                    {mealsDone === mealCount ? "Todas tus comidas completadas ✓" : `Faltan ${mealCount - mealsDone} de ${mealCount} comidas por completar`}
+                  </div>
+                </Panel>
+
+                <Panel>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                    <Dumbbell size={14} color="var(--accent)" /> Entrenamiento
+                  </div>
+                  {nextWorkout ? (
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                      Próximo entreno: <span style={{ color: "var(--accent2)" }}>{nextWorkout.when} — {nextWorkout.day.name || "Día"}</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No tienes días de entrenamiento programados.</div>
+                  )}
+                </Panel>
+              </>
+            );
+          })()}
+
           {[
             { key: "perfil", title: "Perfil", sub: "Tus datos y objetivo", icon: User },
             { key: "nutricion", title: "Nutrición", sub: "Calorías, macros y comidas", icon: UtensilsCrossed },
@@ -1275,12 +1401,15 @@ export default function NutriDash() {
             const mealTotal = meal.items.reduce((s, i) => s + i.kcal, 0);
             const mealMacros = meal.items.reduce((a, i) => ({ p: a.p + i.p, c: a.c + i.c, f: a.f + i.f }), { p: 0, c: 0, f: 0 });
             return (
-              <Panel key={meal.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <Panel key={meal.id} style={meal.completed ? { border: "1px solid var(--accent2)66", background: "linear-gradient(180deg, rgba(196,181,253,0.06), transparent)" } : undefined}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
+                  <button onClick={() => toggleMealCompleted(meal.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", flexShrink: 0 }} title="Marcar comida como completada">
+                    {meal.completed ? <CheckCircle2 size={20} color="var(--accent2)" /> : <Circle size={20} color="var(--text-dim)" />}
+                  </button>
                   <input
                     value={meal.name}
                     onChange={(e) => renameMeal(meal.id, e.target.value)}
-                    style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 16, padding: 0, minWidth: 0, flex: 1 }}
+                    style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 16, padding: 0, minWidth: 0, flex: 1, textDecoration: meal.completed ? "line-through" : "none", opacity: meal.completed ? 0.75 : 1 }}
                   />
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "var(--text-dim)", flexShrink: 0 }}>{round(mealTotal)} kcal</div>
                 </div>
@@ -1298,19 +1427,14 @@ export default function NutriDash() {
                         onSwipeRight={() => { setEditGramsItem({ mealId: meal.id, itemId: item.id }); setEditGramsDraft(String(item.grams)); }}
                         onSwipeLeft={() => removeFromMeal(meal.id, item.id)}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid var(--border)", gap: 8 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                            <FoodIcon food={item} size={32} />
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
-                              <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                                {item.grams} g · {round(item.kcal)} kcal · P {round(item.p)}g · C {round(item.c)}g · G {round(item.f)}g
-                              </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)" }}>
+                          <FoodIcon food={item} size={32} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                              {item.grams} g · {round(item.kcal)} kcal · P {round(item.p)}g · C {round(item.c)}g · G {round(item.f)}g
                             </div>
                           </div>
-                          <button onClick={() => removeFromMeal(meal.id, item.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 6, flexShrink: 0 }}>
-                            <Trash2 size={15} />
-                          </button>
                         </div>
                       </SwipeableItem>
                     ))}
@@ -1335,6 +1459,52 @@ export default function NutriDash() {
               </Panel>
             );
           })}
+
+          {/* -------- Historial de días pasados -------- */}
+          {nutritionHistory.length > 0 && (
+            <Panel>
+              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                Historial de días pasados
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[...nutritionHistory].sort((a, b) => b.date.localeCompare(a.date)).map((day) => {
+                  const open = historyOpenDate === day.date;
+                  return (
+                    <div key={day.date} style={{ border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel2)", overflow: "hidden" }}>
+                      <div onClick={() => setHistoryOpenDate(open ? null : day.date)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", cursor: "pointer" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{formatDateEs(day.date)}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--text-dim)" }}>{round(day.totals.kcal)} kcal</div>
+                          {open ? <ChevronUp size={16} color="var(--text-dim)" /> : <ChevronDown size={16} color="var(--text-dim)" />}
+                        </div>
+                      </div>
+                      {open && (
+                        <div style={{ padding: "0 12px 12px" }}>
+                          <div style={{ display: "flex", gap: 12, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>
+                            <span style={{ color: "var(--protein)" }}>P {round(day.totals.p)}g</span>
+                            <span style={{ color: "var(--carbs)" }}>C {round(day.totals.c)}g</span>
+                            <span style={{ color: "var(--fat)" }}>G {round(day.totals.f)}g</span>
+                          </div>
+                          {day.meals.filter((m) => m.items.length > 0).map((m) => (
+                            <div key={m.id} style={{ marginBottom: 8 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: m.completed ? "var(--accent2)" : "var(--text)", marginBottom: 3 }}>
+                                {m.completed && "✓ "}{m.name}
+                              </div>
+                              {m.items.map((it) => (
+                                <div key={it.id} style={{ fontSize: 11, color: "var(--text-dim)", paddingLeft: 8 }}>
+                                  {it.name} · {it.grams}g · {round(it.kcal)} kcal
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Panel>
+          )}
 
           {/* -------- Calculadora de equivalencias -------- */}
           {(() => {
@@ -1440,7 +1610,7 @@ export default function NutriDash() {
                         <ChevronRight size={16} color="var(--text-dim)" />
                       </div>
                       <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: 4 }}>
-                        {formatDateEs(b.startDate)} – {formatDateEs(b.endDate)} · <span style={{ color: GOAL_META[b.goal].color }}>{GOAL_META[b.goal].label}</span>
+                        {formatDateEs(b.startDate)} – {b.endDate ? formatDateEs(b.endDate) : "sin fecha de fin"} · <span style={{ color: GOAL_META[b.goal].color }}>{GOAL_META[b.goal].label}</span>
                       </div>
                     </button>
                   ))}
@@ -1460,10 +1630,15 @@ export default function NutriDash() {
                 <Panel>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                     <button onClick={() => { setActiveBlockId(null); setExpandedWeekId(null); }} style={backBtnStyle}><ArrowLeft size={16} color="var(--text-dim)" /></button>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 17 }}>{block.name}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{formatDateEs(block.startDate)} – {formatDateEs(block.endDate)}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                        {formatDateEs(block.startDate)} – {block.endDate ? formatDateEs(block.endDate) : "sin fecha de fin"}
+                      </div>
                     </div>
+                    <button onClick={() => { setEditBlockId(block.id); setEditBlockForm({ name: block.name, startDate: block.startDate, endDate: block.endDate || "" }); }} style={iconBtnStyle} title="Editar bloque">
+                      <Pencil size={14} />
+                    </button>
                   </div>
                   <ToggleGroup options={GOAL_OPTIONS} value={block.goal} onChange={(g) => updateBlockGoal(block.id, g)} />
                 </Panel>
@@ -1480,38 +1655,53 @@ export default function NutriDash() {
                           {clonedFrom && <div style={{ fontSize: 10.5, color: "var(--accent2)", marginTop: 2 }}>Clonada de {clonedFrom.label}</div>}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <button onClick={(e) => { e.stopPropagation(); duplicateWeek(week.id); }} title="Duplicar semana" style={iconBtnStyle}><Copy size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setDuplicateWeekId(week.id); setDuplicateWeekName(`Copia de ${week.label}`); }} title="Duplicar semana" style={iconBtnStyle}><Copy size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); removeWeek(week.id); }} title="Eliminar semana" style={{ ...iconBtnStyle, color: "var(--danger)" }}><Trash2 size={14} /></button>
                           {expanded ? <ChevronUp size={18} color="var(--text-dim)" /> : <ChevronDown size={18} color="var(--text-dim)" />}
                         </div>
                       </div>
 
                       {expanded && (
-                        <div style={{ marginTop: 12 }}>
+                        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
                           {weekDays.map((day) => {
                             const dayExList = getExercisesForDay(day.id);
                             return (
-                              <div key={day.id} onClick={() => setSelectedDayId(day.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid var(--border)", cursor: "pointer" }}>
-                                <div style={{ fontSize: 13 }}>{day.name || "Día"} <span style={{ color: "var(--text-dim)" }}>· {formatDateEs(day.date)}</span></div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11.5, color: "var(--text-dim)" }}>
-                                  {dayExList.length} ejercicio{dayExList.length !== 1 ? "s" : ""}
-                                  <button onClick={(e) => { e.stopPropagation(); removeDay(day.id); }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2 }}><Trash2 size={14} /></button>
-                                  <ChevronRight size={14} />
+                              <SwipeableItem
+                                key={day.id}
+                                onSwipeRight={() => { setEditDayItem({ dayId: day.id }); setEditDayDraft({ name: day.name || "", date: day.date }); }}
+                                onSwipeLeft={() => removeDay(day.id)}
+                              >
+                                <div
+                                  onClick={() => setSelectedDayId(day.id)}
+                                  style={{
+                                    display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer",
+                                    padding: "12px 14px", borderRadius: 12, background: "var(--panel2)", border: "1px solid var(--border)",
+                                    boxShadow: "0 3px 10px rgba(0,0,0,0.28)",
+                                  }}
+                                >
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                                    <div style={{ background: "var(--accent)22", border: "1px solid var(--accent)55", color: "var(--accent)", borderRadius: 7, padding: "4px 8px", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, flexShrink: 0 }}>
+                                      {formatDateEs(day.date)}
+                                    </div>
+                                    <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{day.name || "Día"}</div>
+                                  </div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text-dim)", flexShrink: 0 }}>
+                                    {dayExList.length} ej. <ChevronRight size={14} />
+                                  </div>
                                 </div>
-                              </div>
+                              </SwipeableItem>
                             );
                           })}
-                          <div style={{ marginTop: 10 }}>
-                            <button onClick={() => { setAddDayWeekId(week.id); setAddDayDate(weekDays.length ? addDaysToDate(weekDays[weekDays.length - 1].date, 1) : block.startDate); setAddDayName(""); }} style={dashedButtonStyle}>
-                              <Plus size={15} /> Agregar día
-                            </button>
-                          </div>
+                          <button onClick={() => { setAddDayWeekId(week.id); setAddDayDate(weekDays.length ? addDaysToDate(weekDays[weekDays.length - 1].date, 1) : block.startDate); setAddDayName(""); }} style={dashedButtonStyle}>
+                            <Plus size={15} /> Agregar día
+                          </button>
                         </div>
                       )}
                     </Panel>
                   );
                 })}
 
-                <button onClick={() => addWeek(block.id)} style={dashedButtonStyle}><Plus size={16} /> Agregar semana</button>
+                <button onClick={() => { setNewWeekBlockId(block.id); setNewWeekName(`Semana ${blockWeeks.length + 1}`); }} style={dashedButtonStyle}><Plus size={16} /> Agregar semana</button>
 
                 {(() => {
                   const currentMapWeekId = mapWeekId ?? blockWeeks[blockWeeks.length - 1]?.id ?? null;
@@ -1819,6 +2009,37 @@ export default function NutriDash() {
             )}
           </Panel>
 
+          {(() => {
+            const lastMeasurementDate = measurementLogs.length ? [...measurementLogs].sort((a, b) => b.date.localeCompare(a.date))[0].date : null;
+            const nextMeasurementDate = calcNextMeasurementDate(lastMeasurementDate, measurementFreq);
+            const isDue = nextMeasurementDate ? todayISO() >= nextMeasurementDate : false;
+            return (
+              <Panel style={{ border: `1px solid ${isDue ? "var(--fat)" : "var(--accent2)"}55` }}>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Frecuencia de control
+                </div>
+                <ToggleGroup options={FREQ_OPTIONS} value={measurementFreq} onChange={setMeasurementFreq} />
+                <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: "var(--panel2)", display: "flex", alignItems: "center", gap: 10 }}>
+                  {isDue ? <AlertTriangle size={18} color="var(--fat)" style={{ flexShrink: 0 }} /> : <CalendarClock size={18} color="var(--accent2)" style={{ flexShrink: 0 }} />}
+                  <div>
+                    {!nextMeasurementDate ? (
+                      <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>Registra tu primera medición para calcular tu próxima fecha recomendada.</div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: isDue ? "var(--fat)" : "var(--text)" }}>
+                          Próxima medición recomendada: {formatDateEs(nextMeasurementDate)}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: 2 }}>
+                          {isDue ? "¡Ya se cumplió o pasó la fecha! Es buen momento para volver a medirte." : `Faltan ${-daysSince(nextMeasurementDate)} días.`}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </Panel>
+            );
+          })()}
+
           <Panel>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 7 }}>
@@ -1910,44 +2131,12 @@ export default function NutriDash() {
             <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} autoFocus />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "40vh", overflowY: "auto", marginBottom: 14 }}>
-            {filteredFoods.map((f) => {
-              const grams = pickerGrams[f.id] ?? 100;
-              const factor = grams / 100;
-              return (
-                <div key={f.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--panel2)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                      <FoodIcon food={f} size={30} />
-                      <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {f.name} {f.custom && <span style={{ fontSize: 9.5, color: "var(--accent2)", border: "1px solid var(--accent2)", borderRadius: 5, padding: "1px 5px", marginLeft: 6 }}>PROPIO</span>}
-                      </div>
-                    </div>
-                    <input type="number" value={grams} onChange={(e) => setPickerGrams((prev) => ({ ...prev, [f.id]: Number(e.target.value) }))} style={{ ...inputStyle, width: 60, padding: "5px 8px", fontSize: 12.5, flexShrink: 0 }} />
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "var(--text-dim)", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ color: "var(--text)" }}>{round(f.kcal * factor)} kcal</span>
-                      <span style={{ color: "var(--protein)" }}>P {round(f.p * factor)}g</span>
-                      <span style={{ color: "var(--carbs)" }}>C {round(f.c * factor)}g</span>
-                      <span style={{ color: "var(--fat)" }}>G {round(f.f * factor)}g</span>
-                    </div>
-                    <button onClick={() => addFoodFromPicker(f)} style={{ background: "var(--accent)", border: "none", borderRadius: 7, padding: "5px 10px", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
-                      <Plus size={13} /> Agregar
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredFoods.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-dim)", textAlign: "center", padding: "12px 0" }}>Sin resultados.</div>}
-          </div>
-
-          <button onClick={() => setShowCustomForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <button onClick={() => setShowCustomForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 12 }}>
             {showCustomForm ? <ChevronUp size={15} /> : <ChevronDown size={15} />} Crear alimento personalizado
           </button>
 
           {showCustomForm && (
-            <div style={{ marginTop: 12, padding: 14, border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel2)" }}>
+            <div style={{ marginBottom: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel2)" }}>
               <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -1984,6 +2173,38 @@ export default function NutriDash() {
               </button>
             </div>
           )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "40vh", overflowY: "auto", marginBottom: 14 }}>
+            {filteredFoods.map((f) => {
+              const grams = pickerGrams[f.id] ?? 100;
+              const factor = grams / 100;
+              return (
+                <div key={f.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--panel2)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <FoodIcon food={f} size={30} />
+                      <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {f.name} {f.custom && <span style={{ fontSize: 9.5, color: "var(--accent2)", border: "1px solid var(--accent2)", borderRadius: 5, padding: "1px 5px", marginLeft: 6 }}>PROPIO</span>}
+                      </div>
+                    </div>
+                    <input type="number" value={grams} onChange={(e) => setPickerGrams((prev) => ({ ...prev, [f.id]: Number(e.target.value) }))} style={{ ...inputStyle, width: 60, padding: "5px 8px", fontSize: 12.5, flexShrink: 0 }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: "var(--text-dim)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ color: "var(--text)" }}>{round(f.kcal * factor)} kcal</span>
+                      <span style={{ color: "var(--protein)" }}>P {round(f.p * factor)}g</span>
+                      <span style={{ color: "var(--carbs)" }}>C {round(f.c * factor)}g</span>
+                      <span style={{ color: "var(--fat)" }}>G {round(f.f * factor)}g</span>
+                    </div>
+                    <button onClick={() => addFoodFromPicker(f)} style={{ background: "var(--accent)", border: "none", borderRadius: 7, padding: "5px 10px", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+                      <Plus size={13} /> Agregar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredFoods.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-dim)", textAlign: "center", padding: "12px 0" }}>Sin resultados.</div>}
+          </div>
         </ModalShell>
       )}
 
@@ -2046,12 +2267,59 @@ export default function NutriDash() {
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Inicio"><input type="date" style={inputStyle} value={newBlockForm.startDate} onChange={(e) => setNewBlockForm((f) => ({ ...f, startDate: e.target.value }))} /></Field>
-            <Field label="Fin"><input type="date" style={inputStyle} value={newBlockForm.endDate} onChange={(e) => setNewBlockForm((f) => ({ ...f, endDate: e.target.value }))} /></Field>
+            <Field label="Fin (opcional)"><input type="date" style={inputStyle} value={newBlockForm.endDate} onChange={(e) => setNewBlockForm((f) => ({ ...f, endDate: e.target.value }))} /></Field>
           </div>
           <Field label="Objetivo actual">
             <ToggleGroup options={GOAL_OPTIONS} value={newBlockForm.goal} onChange={(g) => setNewBlockForm((f) => ({ ...f, goal: g }))} />
           </Field>
           <button onClick={createBlock} style={primaryButtonStyle}><Plus size={16} /> Crear bloque</button>
+        </ModalShell>
+      )}
+
+      {/* -------------------- MODAL: EDITAR BLOQUE -------------------- */}
+      {editBlockId && (
+        <ModalShell title="Editar bloque" onClose={() => setEditBlockId(null)}>
+          <Field label="Nombre">
+            <input style={selectStyle} value={editBlockForm.name} onChange={(e) => setEditBlockForm((f) => ({ ...f, name: e.target.value }))} />
+          </Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Inicio"><input type="date" style={inputStyle} value={editBlockForm.startDate} onChange={(e) => setEditBlockForm((f) => ({ ...f, startDate: e.target.value }))} /></Field>
+            <Field label="Fin (opcional)"><input type="date" style={inputStyle} value={editBlockForm.endDate} onChange={(e) => setEditBlockForm((f) => ({ ...f, endDate: e.target.value }))} /></Field>
+          </div>
+          <button onClick={confirmEditBlock} style={primaryButtonStyle}>Guardar cambios</button>
+        </ModalShell>
+      )}
+
+      {/* -------------------- MODAL: NUEVA SEMANA -------------------- */}
+      {newWeekBlockId && (
+        <ModalShell title="Nueva semana" onClose={() => setNewWeekBlockId(null)}>
+          <Field label="Nombre">
+            <input style={selectStyle} value={newWeekName} onChange={(e) => setNewWeekName(e.target.value)} autoFocus />
+          </Field>
+          <button onClick={confirmNewWeek} style={primaryButtonStyle}><Plus size={16} /> Crear semana</button>
+        </ModalShell>
+      )}
+
+      {/* -------------------- MODAL: DUPLICAR SEMANA -------------------- */}
+      {duplicateWeekId && (
+        <ModalShell title="Duplicar semana" onClose={() => setDuplicateWeekId(null)}>
+          <Field label="Nombre de la nueva semana">
+            <input style={selectStyle} value={duplicateWeekName} onChange={(e) => setDuplicateWeekName(e.target.value)} autoFocus />
+          </Field>
+          <button onClick={confirmDuplicateWeek} style={primaryButtonStyle}><Copy size={16} /> Duplicar</button>
+        </ModalShell>
+      )}
+
+      {/* -------------------- MODAL: EDITAR DÍA (swipe derecha) -------------------- */}
+      {editDayItem && (
+        <ModalShell title="Editar día" onClose={() => setEditDayItem(null)}>
+          <Field label="Nombre">
+            <input style={selectStyle} value={editDayDraft.name} onChange={(e) => setEditDayDraft((d) => ({ ...d, name: e.target.value }))} />
+          </Field>
+          <Field label="Fecha">
+            <input type="date" style={inputStyle} value={editDayDraft.date} onChange={(e) => setEditDayDraft((d) => ({ ...d, date: e.target.value }))} />
+          </Field>
+          <button onClick={confirmEditDay} style={primaryButtonStyle}>Guardar cambios</button>
         </ModalShell>
       )}
 
@@ -2076,6 +2344,26 @@ export default function NutriDash() {
             <input value={exerciseSearch} onChange={(e) => setExerciseSearch(e.target.value)} placeholder="Buscar ejercicio..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} autoFocus />
           </div>
 
+          <button onClick={() => setShowCustomExerciseForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 12 }}>
+            {showCustomExerciseForm ? <ChevronUp size={15} /> : <ChevronDown size={15} />} Crear ejercicio nuevo en el catálogo
+          </button>
+
+          {showCustomExerciseForm && (
+            <div style={{ marginBottom: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel2)" }}>
+              <Field label="Nombre general">
+                <input style={selectStyle} value={customExerciseForm.name} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej. Hack squat" />
+              </Field>
+              <Field label="Grupo muscular">
+                <select style={selectStyle} value={customExerciseForm.muscleGroup} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, muscleGroup: e.target.value }))}>
+                  {MUSCLE_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </Field>
+              <button onClick={addCustomCatalogExercise} style={{ ...primaryButtonStyle, background: "var(--accent2)" }}>
+                <Plus size={16} /> Guardar en el catálogo
+              </button>
+            </div>
+          )}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "40vh", overflowY: "auto", marginBottom: 14 }}>
             {filteredCatalog.map((c) => (
               <div key={c.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--panel2)" }}>
@@ -2098,26 +2386,6 @@ export default function NutriDash() {
             ))}
             {filteredCatalog.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-dim)", textAlign: "center", padding: "12px 0" }}>Sin resultados.</div>}
           </div>
-
-          <button onClick={() => setShowCustomExerciseForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            {showCustomExerciseForm ? <ChevronUp size={15} /> : <ChevronDown size={15} />} Crear ejercicio nuevo en el catálogo
-          </button>
-
-          {showCustomExerciseForm && (
-            <div style={{ marginTop: 12, padding: 14, border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel2)" }}>
-              <Field label="Nombre general">
-                <input style={selectStyle} value={customExerciseForm.name} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej. Hack squat" />
-              </Field>
-              <Field label="Grupo muscular">
-                <select style={selectStyle} value={customExerciseForm.muscleGroup} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, muscleGroup: e.target.value }))}>
-                  {MUSCLE_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </Field>
-              <button onClick={addCustomCatalogExercise} style={{ ...primaryButtonStyle, background: "var(--accent2)" }}>
-                <Plus size={16} /> Guardar en el catálogo
-              </button>
-            </div>
-          )}
         </ModalShell>
       )}
     </div>
