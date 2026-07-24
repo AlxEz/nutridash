@@ -10,28 +10,28 @@ import {
    BASE DE ALIMENTOS (valores por 100 g, salvo que se indique)
 --------------------------------------------------------- */
 const FOOD_DB_INITIAL = [
-  { id: "f1", name: "Arroz blanco cocido", kcal: 130, p: 2.7, c: 28.2, f: 0.3, icon: "🍚", category: "carbohidrato" },
-  { id: "f2", name: "Pechuga de pollo cocida", kcal: 165, p: 31, c: 0, f: 3.6, icon: "🍗", category: "proteina" },
-  { id: "f3", name: "Huevo entero", kcal: 155, p: 13, c: 1.1, f: 11, icon: "🥚", category: "grasa" },
-  { id: "f4", name: "Avena", kcal: 389, p: 16.9, c: 66.3, f: 6.9, icon: "🥣", category: "carbohidrato" },
-  { id: "f5", name: "Pan integral", kcal: 247, p: 13, c: 41, f: 3.4, icon: "🍞", category: "carbohidrato" },
-  { id: "f6", name: "Atún en agua", kcal: 116, p: 26, c: 0, f: 1, icon: "🐟", category: "proteina" },
-  { id: "f7", name: "Frijoles negros cocidos", kcal: 132, p: 8.9, c: 23.7, f: 0.5, icon: "🫘", category: "carbohidrato" },
-  { id: "f8", name: "Aguacate", kcal: 160, p: 2, c: 8.5, f: 14.7, icon: "🥑", category: "grasa" },
-  { id: "f9", name: "Plátano", kcal: 89, p: 1.1, c: 22.8, f: 0.3, icon: "🍌", category: "carbohidrato" },
-  { id: "f10", name: "Almendras", kcal: 579, p: 21, c: 22, f: 50, icon: "🌰", category: "grasa" },
-  { id: "f11", name: "Leche entera", kcal: 61, p: 3.2, c: 4.8, f: 3.3, icon: "🥛", category: "grasa" },
-  { id: "f12", name: "Yogur griego natural", kcal: 59, p: 10, c: 3.6, f: 0.4, icon: "🍶", category: "proteina" },
-  { id: "f13", name: "Salmón", kcal: 208, p: 20, c: 0, f: 13, icon: "🍣", category: "grasa" },
-  { id: "f14", name: "Carne de res molida 90/10", kcal: 176, p: 20, c: 0, f: 10, icon: "🥩", category: "grasa" },
-  { id: "f15", name: "Tortilla de maíz", kcal: 218, p: 5.7, c: 44.6, f: 2.3, icon: "🌽", category: "carbohidrato" },
-  { id: "f16", name: "Camote cocido", kcal: 90, p: 2, c: 20.7, f: 0.1, icon: "🍠", category: "carbohidrato" },
-  { id: "f17", name: "Brócoli", kcal: 34, p: 2.8, c: 6.6, f: 0.4, icon: "🥦", category: "carbohidrato" },
-  { id: "f18", name: "Queso panela", kcal: 250, p: 18, c: 3, f: 19, icon: "🧀", category: "grasa" },
-  { id: "f19", name: "Mantequilla de maní", kcal: 588, p: 25, c: 20, f: 50, icon: "🥜", category: "grasa" },
-  { id: "f20", name: "Lentejas cocidas", kcal: 116, p: 9, c: 20, f: 0.4, icon: "🍲", category: "carbohidrato" },
+  { id: "f1", name: "Arroz blanco cocido", kcal: 130, p: 2.7, c: 28.2, f: 0.3, category: "carbohidrato" },
+  { id: "f2", name: "Pechuga de pollo cocida", kcal: 165, p: 31, c: 0, f: 3.6, category: "proteina" },
+  { id: "f3", name: "Huevo entero", kcal: 155, p: 13, c: 1.1, f: 11, category: "grasa" },
+  { id: "f4", name: "Avena", kcal: 389, p: 16.9, c: 66.3, f: 6.9, category: "carbohidrato" },
+  { id: "f5", name: "Pan integral", kcal: 247, p: 13, c: 41, f: 3.4, category: "carbohidrato" },
+  { id: "f6", name: "Atún en agua", kcal: 116, p: 26, c: 0, f: 1, category: "proteina" },
+  { id: "f7", name: "Frijoles negros cocidos", kcal: 132, p: 8.9, c: 23.7, f: 0.5, category: "carbohidrato" },
+  { id: "f8", name: "Aguacate", kcal: 160, p: 2, c: 8.5, f: 14.7, category: "grasa" },
+  { id: "f9", name: "Plátano", kcal: 89, p: 1.1, c: 22.8, f: 0.3, category: "carbohidrato" },
+  { id: "f10", name: "Almendras", kcal: 579, p: 21, c: 22, f: 50, category: "grasa" },
+  { id: "f11", name: "Leche entera", kcal: 61, p: 3.2, c: 4.8, f: 3.3, category: "grasa" },
+  { id: "f12", name: "Yogur griego natural", kcal: 59, p: 10, c: 3.6, f: 0.4, category: "proteina" },
+  { id: "f13", name: "Salmón", kcal: 208, p: 20, c: 0, f: 13, category: "grasa" },
+  { id: "f14", name: "Carne de res molida 90/10", kcal: 176, p: 20, c: 0, f: 10, category: "grasa" },
+  { id: "f15", name: "Tortilla de maíz", kcal: 218, p: 5.7, c: 44.6, f: 2.3, category: "carbohidrato" },
+  { id: "f16", name: "Camote cocido", kcal: 90, p: 2, c: 20.7, f: 0.1, category: "carbohidrato" },
+  { id: "f17", name: "Brócoli", kcal: 34, p: 2.8, c: 6.6, f: 0.4, category: "carbohidrato" },
+  { id: "f18", name: "Queso panela", kcal: 250, p: 18, c: 3, f: 19, category: "grasa" },
+  { id: "f19", name: "Mantequilla de maní", kcal: 588, p: 25, c: 20, f: 50, category: "grasa" },
+  { id: "f20", name: "Lentejas cocidas", kcal: 116, p: 9, c: 20, f: 0.4, category: "carbohidrato" },
   // valores de la etiqueta real del producto (San Juan, claras líquidas pasteurizadas): 42 kcal / 100 ml
-  { id: "f21", name: "Claras de huevo líquidas (San Juan)", kcal: 42, p: 10, c: 1, f: 0, icon: "🫙", category: "proteina" },
+  { id: "f21", name: "Claras de huevo líquidas (San Juan)", kcal: 42, p: 10, c: 1, f: 0, category: "proteina" },
 ];
 
 const MACRO_CATEGORIES = [
@@ -185,6 +185,9 @@ const MEASUREMENT_FIELDS = [
 ];
 function daysSince(dateStr) {
   return Math.floor((Date.now() - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000);
+}
+function dateDiffDays(fromDate, toDate) {
+  return Math.round((new Date(`${toDate}T00:00:00`) - new Date(`${fromDate}T00:00:00`)) / 86400000);
 }
 
 /* ---- Frecuencia de control elegida por el usuario para "próxima medición" ---- */
@@ -609,13 +612,22 @@ function MacroBar({ icon: Icon, label, consumed, target, color }) {
 /* ---------------------------------------------------------
    ÍCONO / FOTO DE ALIMENTO
 --------------------------------------------------------- */
+/** Ícono y color vectorial estándar por categoría de macro — se usa en toda la app (listas, resúmenes, alimentos). */
+const MACRO_ICON = { proteina: Beef, carbohidrato: Wheat, grasa: Droplet };
+const MACRO_ICON_COLOR = { proteina: "var(--protein)", carbohidrato: "var(--carbs)", grasa: "var(--fat)" };
+function CategoryIcon({ category, size = 18 }) {
+  const Icon = MACRO_ICON[category] || Beef;
+  return <Icon size={size} color={MACRO_ICON_COLOR[category] || "var(--text-dim)"} />;
+}
+
 function FoodIcon({ food, size = 36 }) {
   if (food.image) {
     return <img src={food.image} alt={food.name} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border)", flexShrink: 0 }} />;
   }
+  const category = foodCategory(food);
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.5, flexShrink: 0 }}>
-      {food.icon || "🍽️"}
+    <div style={{ width: size, height: size, borderRadius: "50%", background: `${MACRO_ICON_COLOR[category]}1A`, border: `1px solid ${MACRO_ICON_COLOR[category]}55`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <CategoryIcon category={category} size={size * 0.5} />
     </div>
   );
 }
@@ -817,6 +829,7 @@ export default function NutriDash() {
   /* ---- Fase 2: entrenamiento + Fase 3: navegación e identidad ---- */
   const [appView, setAppView] = useState("inicio"); // 'inicio' | 'perfil' | 'nutricion' | 'entrenamiento'
   const [account, setAccount] = useState(stored.account ?? { name: "", email: "", password: "" });
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
 
   const [weightLogs, setWeightLogs] = useState(stored.weightLogs ?? []);
@@ -849,6 +862,9 @@ export default function NutriDash() {
   const [newBlockForm, setNewBlockForm] = useState({ name: "", startDate: todayISO(), endDate: "", goal: "mantenimiento" });
   const [editBlockId, setEditBlockId] = useState(null);
   const [editBlockForm, setEditBlockForm] = useState({ name: "", startDate: "", endDate: "" });
+  const [confirmDeleteBlockId, setConfirmDeleteBlockId] = useState(null);
+  const [duplicateBlockId, setDuplicateBlockId] = useState(null);
+  const [duplicateBlockForm, setDuplicateBlockForm] = useState({ name: "", startDate: todayISO() });
 
   const [newWeekBlockId, setNewWeekBlockId] = useState(null);
   const [newWeekName, setNewWeekName] = useState("");
@@ -975,7 +991,7 @@ export default function NutriDash() {
     if ([kcal, p, c, f].some((v) => v === "" || isNaN(Number(v)) || Number(v) < 0)) { setCustomError("Revisa que calorías, proteína, carbos y grasas sean números válidos."); return; }
     if (!category) { setCustomError("Elige la categoría del alimento."); return; }
     const factor = 100 / Number(portion);
-    const newFood = { id: uid(), name: name.trim(), kcal: Number(kcal) * factor, p: Number(p) * factor, c: Number(c) * factor, f: Number(f) * factor, custom: true, image: image || null, icon: "🍽️", category };
+    const newFood = { id: uid(), name: name.trim(), kcal: Number(kcal) * factor, p: Number(p) * factor, c: Number(c) * factor, f: Number(f) * factor, custom: true, image: image || null, category };
     setFoods((prev) => [newFood, ...prev]);
     setCustomForm({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
     setCustomError("");
@@ -1052,6 +1068,47 @@ export default function NutriDash() {
     duplicateWeek(duplicateWeekId, duplicateWeekName);
     setDuplicateWeekId(null);
     setDuplicateWeekName("");
+  }
+
+  /** Elimina un bloque completo junto con sus semanas, días, ejercicios y series. */
+  function removeBlock(blockId) {
+    const weekIds = weeks.filter((w) => w.blockId === blockId).map((w) => w.id);
+    const dayIds = days.filter((d) => weekIds.includes(d.weekId)).map((d) => d.id);
+    const exIds = dayExercises.filter((e) => dayIds.includes(e.dayId)).map((e) => e.id);
+    setBlocks((prev) => prev.filter((b) => b.id !== blockId));
+    setWeeks((prev) => prev.filter((w) => w.blockId !== blockId));
+    setDays((prev) => prev.filter((d) => !weekIds.includes(d.weekId)));
+    setDayExercises((prev) => prev.filter((e) => !dayIds.includes(e.dayId)));
+    setSets((prev) => prev.filter((s) => !exIds.includes(s.dayExerciseId)));
+    if (activeBlockId === blockId) setActiveBlockId(null);
+    setConfirmDeleteBlockId(null);
+  }
+
+  /** Clona semanas/días/ejercicios de un bloque a uno nuevo (sin series ni referencias al original). */
+  function confirmDuplicateBlock() {
+    const source = blocks.find((b) => b.id === duplicateBlockId);
+    if (!source || !duplicateBlockForm.name.trim() || !duplicateBlockForm.startDate) return;
+    const delta = dateDiffDays(source.startDate, duplicateBlockForm.startDate);
+    const newBlock = { id: uid(), name: duplicateBlockForm.name.trim(), startDate: duplicateBlockForm.startDate, endDate: source.endDate ? addDaysToDate(source.endDate, delta) : null, goal: source.goal };
+    const sourceWeeks = getWeeksForBlock(source.id);
+    const newWeeks = [], newDays = [], newExercises = [];
+    sourceWeeks.forEach((w) => {
+      const newWeek = { id: uid(), blockId: newBlock.id, order: w.order, label: w.label, clonedFromWeekId: null };
+      newWeeks.push(newWeek);
+      getDaysForWeek(w.id).forEach((d) => {
+        const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(d.date, delta), order: d.order, name: d.name };
+        newDays.push(newDay);
+        getExercisesForDay(d.id).forEach((ex) => {
+          newExercises.push({ id: uid(), dayId: newDay.id, catalogExerciseId: ex.catalogExerciseId, variantName: ex.variantName, order: ex.order, sourceDayExerciseId: null });
+        });
+      });
+    });
+    setBlocks((prev) => [...prev, newBlock]);
+    setWeeks((prev) => [...prev, ...newWeeks]);
+    setDays((prev) => [...prev, ...newDays]);
+    setDayExercises((prev) => [...prev, ...newExercises]);
+    setActiveBlockId(newBlock.id);
+    setDuplicateBlockId(null);
   }
 
   function updateBlockGoal(blockId, newGoal) {
@@ -1301,17 +1358,22 @@ export default function NutriDash() {
             </div>
             <div>
               <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 21, letterSpacing: 0.5, lineHeight: 1 }}>
-                NUTRI<span style={{ color: "var(--accent)" }}>DASH</span>
+                Test<span style={{ color: "var(--accent)" }}>App</span>
               </div>
               <div style={{ fontSize: 10.5, color: "var(--text-dim)", letterSpacing: 1.5, textTransform: "uppercase" }}>
                 {appView === "inicio" && "Menú principal"}
-                {appView === "perfil" && "Tu perfil"}
+                {appView === "perfil" && "Datos"}
                 {appView === "nutricion" && "Tablero de nutrición"}
                 {appView === "entrenamiento" && "Tablero de entrenamiento"}
                 {appView === "progreso" && "Progreso corporal"}
               </div>
             </div>
           </div>
+          {appView === "inicio" && (
+            <button onClick={() => setShowAccountModal(true)} title="Cuenta" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <User size={18} color="var(--text-dim)" />
+            </button>
+          )}
         </div>
 
         {/* -------------------- PANTALLA: INICIO -------------------- */}
@@ -1321,6 +1383,7 @@ export default function NutriDash() {
             const kcalLeft = Math.max(targetCalories - totals.kcal, 0);
             const pLeft = Math.max(targetProtein - totals.p, 0);
             const cLeft = Math.max(targetCarbs - totals.c, 0);
+            const fLeft = Math.max(targetFat - totals.f, 0);
             const overBudget = totals.kcal > targetCalories;
             const mealsDone = meals.filter((m) => m.completed).length;
             const nextWorkout = getNextWorkoutDay();
@@ -1333,8 +1396,11 @@ export default function NutriDash() {
                   {overBudget ? (
                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
                   ) : (
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>
-                      Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> · <span style={{ color: "var(--protein)" }}>{round(pLeft)}g P</span> · <span style={{ color: "var(--carbs)" }}>{round(cLeft)}g C</span>
+                    <div style={{ fontSize: 14, fontWeight: 700, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                      Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> ·
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={13} /> {round(pLeft)}g</span> ·
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={13} /> {round(cLeft)}g</span> ·
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={13} /> {round(fLeft)}g</span>
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
@@ -1359,7 +1425,7 @@ export default function NutriDash() {
           })()}
 
           {[
-            { key: "perfil", title: "Perfil", sub: "Tus datos y objetivo", icon: User },
+            { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
             { key: "nutricion", title: "Nutrición", sub: "Calorías, macros y comidas", icon: UtensilsCrossed },
             { key: "entrenamiento", title: "Entrenamiento", sub: "Bloques, semanas y ejercicios", icon: Dumbbell },
             { key: "progreso", title: "Progreso Corporal", sub: "Peso y medidas a lo largo del tiempo", icon: Ruler },
@@ -1604,15 +1670,32 @@ export default function NutriDash() {
               {blocks.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                   {blocks.map((b) => (
-                    <button key={b.id} onClick={() => setActiveBlockId(b.id)} style={{ textAlign: "left", padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", color: "var(--text)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={b.id} style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)" }}>
+                      <div onClick={() => setActiveBlockId(b.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{b.name}</div>
                         <ChevronRight size={16} color="var(--text-dim)" />
                       </div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: 4 }}>
+                      <div onClick={() => setActiveBlockId(b.id)} style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: 4, cursor: "pointer" }}>
                         {formatDateEs(b.startDate)} – {b.endDate ? formatDateEs(b.endDate) : "sin fecha de fin"} · <span style={{ color: GOAL_META[b.goal].color }}>{GOAL_META[b.goal].label}</span>
                       </div>
-                    </button>
+
+                      {confirmDeleteBlockId === b.id ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                          <span style={{ fontSize: 11.5, color: "var(--danger)", flex: 1 }}>¿Eliminar este bloque y toda su rutina?</span>
+                          <button onClick={() => setConfirmDeleteBlockId(null)} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11 }}>Cancelar</button>
+                          <button onClick={() => removeBlock(b.id)} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, background: "var(--danger)", color: "#07060B" }}>Eliminar</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: 8, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                          <button onClick={() => { setDuplicateBlockId(b.id); setDuplicateBlockForm({ name: `Copia de ${b.name}`, startDate: todayISO() }); }} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}>
+                            <Copy size={12} /> Duplicar
+                          </button>
+                          <button onClick={() => setConfirmDeleteBlockId(b.id)} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, color: "var(--danger)", display: "flex", alignItems: "center", gap: 5 }}>
+                            <Trash2 size={12} /> Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -1838,22 +1921,9 @@ export default function NutriDash() {
         </div>
         )}
 
-        {/* -------------------- PANTALLA: PERFIL -------------------- */}
+        {/* -------------------- PANTALLA: PERFIL (Datos) -------------------- */}
         {appView === "perfil" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Panel>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 12, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Cuenta</div>
-            <Field label="Nombre">
-              <input style={selectStyle} value={account.name} onChange={(e) => setAccount((a) => ({ ...a, name: e.target.value }))} placeholder="Tu nombre" />
-            </Field>
-            <Field label="Correo">
-              <input type="email" style={selectStyle} value={account.email} onChange={(e) => setAccount((a) => ({ ...a, email: e.target.value }))} placeholder="tucorreo@ejemplo.com" />
-            </Field>
-            <Field label="Contraseña">
-              <input type="password" style={selectStyle} value={account.password} onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))} placeholder="••••••••" />
-            </Field>
-          </Panel>
-
           <Panel>
             <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 12, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Datos personales</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -2128,7 +2198,7 @@ export default function NutriDash() {
         <ModalShell title={`Agregar a ${meals.find((m) => m.id === pickerMeal)?.name ?? ""}`} onClose={() => setPickerMeal(null)} wide>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
             <Search size={15} color="var(--text-dim)" />
-            <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} autoFocus />
+            <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
           </div>
 
           <button onClick={() => setShowCustomForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 12 }}>
@@ -2208,11 +2278,26 @@ export default function NutriDash() {
         </ModalShell>
       )}
 
+      {/* -------------------- MODAL: CUENTA -------------------- */}
+      {showAccountModal && (
+        <ModalShell title="Cuenta" onClose={() => setShowAccountModal(false)}>
+          <Field label="Nombre">
+            <input style={selectStyle} value={account.name} onChange={(e) => setAccount((a) => ({ ...a, name: e.target.value }))} placeholder="Tu nombre" />
+          </Field>
+          <Field label="Correo">
+            <input type="email" style={selectStyle} value={account.email} onChange={(e) => setAccount((a) => ({ ...a, email: e.target.value }))} placeholder="tucorreo@ejemplo.com" />
+          </Field>
+          <Field label="Contraseña">
+            <input type="password" style={selectStyle} value={account.password} onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))} placeholder="••••••••" />
+          </Field>
+        </ModalShell>
+      )}
+
       {/* -------------------- MODAL: EDITAR GRAMOS (swipe) -------------------- */}
       {editGramsItem && (
         <ModalShell title="Editar cantidad" onClose={() => setEditGramsItem(null)}>
           <Field label="Gramos">
-            <input type="number" style={inputStyle} value={editGramsDraft} onChange={(e) => setEditGramsDraft(e.target.value)} autoFocus />
+            <input type="number" style={inputStyle} value={editGramsDraft} onChange={(e) => setEditGramsDraft(e.target.value)} />
           </Field>
           <button
             onClick={() => { updateItemGrams(editGramsItem.mealId, editGramsItem.itemId, Number(editGramsDraft)); setEditGramsItem(null); }}
@@ -2227,7 +2312,7 @@ export default function NutriDash() {
       {saveTemplateMealId && (
         <ModalShell title="Guardar como plantilla" onClose={() => setSaveTemplateMealId(null)}>
           <Field label="Nombre de la plantilla">
-            <input style={selectStyle} value={templateNameDraft} onChange={(e) => setTemplateNameDraft(e.target.value)} placeholder='Ej. "Mi desayuno de siempre"' autoFocus />
+            <input style={selectStyle} value={templateNameDraft} onChange={(e) => setTemplateNameDraft(e.target.value)} placeholder='Ej. "Mi desayuno de siempre"' />
           </Field>
           <button onClick={confirmSaveTemplate} style={primaryButtonStyle}><Plus size={16} /> Guardar plantilla</button>
         </ModalShell>
@@ -2290,11 +2375,27 @@ export default function NutriDash() {
         </ModalShell>
       )}
 
+      {/* -------------------- MODAL: DUPLICAR BLOQUE -------------------- */}
+      {duplicateBlockId && (
+        <ModalShell title="Duplicar bloque" onClose={() => setDuplicateBlockId(null)}>
+          <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+            Clona las semanas, días y ejercicios de este bloque (sin series registradas) para no armar la rutina desde cero.
+          </div>
+          <Field label="Nombre del nuevo bloque">
+            <input style={selectStyle} value={duplicateBlockForm.name} onChange={(e) => setDuplicateBlockForm((f) => ({ ...f, name: e.target.value }))} />
+          </Field>
+          <Field label="Fecha de inicio">
+            <input type="date" style={inputStyle} value={duplicateBlockForm.startDate} onChange={(e) => setDuplicateBlockForm((f) => ({ ...f, startDate: e.target.value }))} />
+          </Field>
+          <button onClick={confirmDuplicateBlock} style={primaryButtonStyle}><Copy size={16} /> Duplicar bloque</button>
+        </ModalShell>
+      )}
+
       {/* -------------------- MODAL: NUEVA SEMANA -------------------- */}
       {newWeekBlockId && (
         <ModalShell title="Nueva semana" onClose={() => setNewWeekBlockId(null)}>
           <Field label="Nombre">
-            <input style={selectStyle} value={newWeekName} onChange={(e) => setNewWeekName(e.target.value)} autoFocus />
+            <input style={selectStyle} value={newWeekName} onChange={(e) => setNewWeekName(e.target.value)} />
           </Field>
           <button onClick={confirmNewWeek} style={primaryButtonStyle}><Plus size={16} /> Crear semana</button>
         </ModalShell>
@@ -2304,7 +2405,7 @@ export default function NutriDash() {
       {duplicateWeekId && (
         <ModalShell title="Duplicar semana" onClose={() => setDuplicateWeekId(null)}>
           <Field label="Nombre de la nueva semana">
-            <input style={selectStyle} value={duplicateWeekName} onChange={(e) => setDuplicateWeekName(e.target.value)} autoFocus />
+            <input style={selectStyle} value={duplicateWeekName} onChange={(e) => setDuplicateWeekName(e.target.value)} />
           </Field>
           <button onClick={confirmDuplicateWeek} style={primaryButtonStyle}><Copy size={16} /> Duplicar</button>
         </ModalShell>
@@ -2341,7 +2442,7 @@ export default function NutriDash() {
         <ModalShell title="Agregar ejercicio" onClose={() => setExercisePickerDayId(null)} wide>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
             <Search size={15} color="var(--text-dim)" />
-            <input value={exerciseSearch} onChange={(e) => setExerciseSearch(e.target.value)} placeholder="Buscar ejercicio..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} autoFocus />
+            <input value={exerciseSearch} onChange={(e) => setExerciseSearch(e.target.value)} placeholder="Buscar ejercicio..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
           </div>
 
           <button onClick={() => setShowCustomExerciseForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 12 }}>
