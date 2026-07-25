@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -858,7 +858,7 @@ function RestTimer() {
   const ss = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div style={{ position: "fixed", bottom: 18, right: 18, zIndex: 40 }}>
+    <div style={{ position: "fixed", bottom: 84, right: 18, zIndex: 45 }}>
       {expanded && (
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.45)", width: 172 }}>
           <div style={{ textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: seconds === 0 ? "var(--danger)" : "var(--text)", marginBottom: 10 }}>{mm}:{ss}</div>
@@ -883,7 +883,47 @@ function RestTimer() {
   );
 }
 
-/** Calendario mensual de consistencia: colorea cada día según cuántas de las 3 misiones se cumplieron. */
+/** Barra de navegación inferior fija — traslúcida (glassmorphism), 4 accesos siempre disponibles. */
+const BOTTOM_NAV_ITEMS = [
+  { key: "inicio", label: "Inicio", icon: Home },
+  { key: "nutricion", label: "Nutrición", icon: UtensilsCrossed },
+  { key: "entrenamiento", label: "Entreno", icon: Dumbbell },
+  { key: "progreso", label: "Progreso", icon: Ruler },
+];
+function BottomBar({ active, onNavigate }) {
+  return (
+    <div
+      style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40,
+        background: "rgba(18,15,27,0.78)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+        borderTop: "1px solid rgba(255,255,255,0.09)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        display: "flex", justifyContent: "space-around", alignItems: "center",
+      }}
+    >
+      {BOTTOM_NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+        const isActive = active === key;
+        return (
+          <button
+            key={key}
+            onClick={() => onNavigate(key)}
+            style={{
+              flex: 1, background: "none", border: "none", cursor: "pointer",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              padding: "10px 4px 8px", color: isActive ? "var(--accent)" : "var(--text-dim)",
+              opacity: isActive ? 1 : 0.75, transition: "color .15s ease, opacity .15s ease",
+            }}
+          >
+            <Icon size={21} strokeWidth={isActive ? 2.4 : 2} />
+            <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, fontFamily: "'Rajdhani', sans-serif", letterSpacing: 0.3 }}>{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+
 const CAL_LEVEL_STYLE = {
   excelente: { background: "var(--accent2)", color: "#07060B" },
   parcial: { background: "var(--fat)", color: "#07060B" },
@@ -1708,7 +1748,7 @@ export default function NutriDash() {
       "--accent": "#8B5CF6", "--accent2": "#C084FC", "--protein": "#E85D75", "--carbs": "#5CACFF",
       "--fat": "#FFC857", "--text": "#F3F1EA", "--text-dim": "#8A93A6", "--danger": "#FF5C5C",
       background: "var(--bg)", minHeight: "100vh", fontFamily: "'Inter', sans-serif",
-      color: "var(--text)", padding: "18px 14px 40px", boxSizing: "border-box",
+      color: "var(--text)", padding: "18px 14px 92px", boxSizing: "border-box",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
@@ -1853,9 +1893,6 @@ export default function NutriDash() {
 
           {[
             { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
-            { key: "nutricion", title: "Nutrición", sub: "Calorías, macros y comidas", icon: UtensilsCrossed },
-            { key: "entrenamiento", title: "Entrenamiento", sub: "Bloques, semanas y ejercicios", icon: Dumbbell },
-            { key: "progreso", title: "Progreso Corporal", sub: "Peso y medidas a lo largo del tiempo", icon: Ruler },
           ].map(({ key, title, sub, icon: Icon }) => (
             <button
               key={key}
@@ -3082,7 +3119,7 @@ export default function NutriDash() {
 
       {toastMsg && (
         <div style={{
-          position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 100,
+          position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)", zIndex: 100,
           background: "var(--panel)", border: "1px solid var(--accent2)", color: "var(--text)",
           padding: "10px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600,
           boxShadow: "0 8px 24px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 8,
@@ -3091,6 +3128,8 @@ export default function NutriDash() {
           <CheckCircle2 size={16} color="var(--accent2)" style={{ flexShrink: 0 }} /> {toastMsg}
         </div>
       )}
+
+      <BottomBar active={appView} onNavigate={setAppView} />
     </div>
   );
 }
