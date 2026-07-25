@@ -78,7 +78,10 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 function addDaysToDate(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 function formatDateEs(dateStr) {
   if (!dateStr) return "";
@@ -223,7 +226,14 @@ const iconBtnStyle = { background: "var(--panel2)", border: "1px solid var(--bor
 const dashedButtonStyle = { width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "#0D0B14", color: "var(--accent)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 };
 const primaryButtonStyle = { width: "100%", padding: "11px", borderRadius: 9, border: "none", background: "var(--accent)", color: "#07060B", fontWeight: 700, fontSize: 13.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+/** Fecha de HOY en YYYY-MM-DD según la hora LOCAL del dispositivo (no UTC). */
+const todayISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
 /* ---------------------------------------------------------
    CÁLCULOS
@@ -742,17 +752,53 @@ function ToggleGroup({ options, value, onChange }) {
   );
 }
 
+/** Altura del teclado virtual en vivo, vía visualViewport (0 si no hay teclado o no hay soporte). */
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    onResize();
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => { vv.removeEventListener("resize", onResize); vv.removeEventListener("scroll", onResize); };
+  }, []);
+  return inset;
+}
+
 function ModalShell({ title, onClose, children, wide }) {
+  const keyboardInset = useKeyboardInset();
+
+  /** Al enfocar cualquier input/select/textarea del modal, lo centra sobre el teclado. */
+  function handleFocus(e) {
+    const el = e.target;
+    if (!["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 300);
+  }
+
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(5,7,11,0.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50, backdropFilter: "blur(2px)" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "18px 18px 0 0", width: "100%", maxWidth: wide ? 520 : 460, maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 -8px 30px rgba(0,0,0,0.5)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px", borderBottom: "1px solid var(--border)" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--panel)", border: "1px solid var(--border)", borderRadius: "18px 18px 0 0",
+          width: "100%", maxWidth: wide ? 520 : 460,
+          maxHeight: keyboardInset > 0 ? `calc(88vh - ${keyboardInset}px)` : "88vh",
+          display: "flex", flexDirection: "column",
+          boxShadow: "0 -8px 30px rgba(0,0,0,0.5)",
+          transform: `translateY(-${keyboardInset}px)`,
+          transition: "transform .2s ease, max-height .2s ease",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
           <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 17, letterSpacing: 0.5 }}>{title}</div>
-          <button onClick={onClose} style={{ background: "#1E1929", border: "none", borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ background: "#1E1929", border: "none", borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
             <X size={16} color="var(--text-dim)" />
           </button>
         </div>
-        <div style={{ padding: 18, overflowY: "auto" }}>{children}</div>
+        <div onFocus={handleFocus} style={{ padding: 18, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>{children}</div>
       </div>
     </div>
   );
@@ -910,7 +956,7 @@ export default function NutriDash() {
     return { kcal, p, c, f };
   }, [meals]);
 
-  /** Reseteo diario: si cambió la fecha, archiva el día anterior a nutritionHistory y limpia el checklist/comidas de hoy. */
+  /** Reseteo diario: si cambió la fecha LOCAL, archiva el día anterior a nutritionHistory y limpia el checklist/comidas de hoy. */
   useEffect(() => {
     function checkDailyReset() {
       const today = todayISO();
@@ -921,7 +967,14 @@ export default function NutriDash() {
     }
     checkDailyReset();
     const interval = setInterval(checkDailyReset, 60000);
-    return () => clearInterval(interval);
+    const onVisible = () => { if (document.visibilityState === "visible") checkDailyReset(); };
+    window.addEventListener("focus", checkDailyReset);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", checkDailyReset);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [nutritionDate, meals, totals]);
 
   function removeFromMeal(mealId, itemId) {
