@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -1018,6 +1018,8 @@ export default function NutriDash() {
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerGrams, setPickerGrams] = useState({});
   const [recentFoodIds, setRecentFoodIds] = useState(stored.recentFoodIds ?? []);
+  const [recentPortionFood, setRecentPortionFood] = useState(null);
+  const [recentPortionDraft, setRecentPortionDraft] = useState("100");
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customForm, setCustomForm] = useState({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
   const [customError, setCustomError] = useState("");
@@ -1037,6 +1039,7 @@ export default function NutriDash() {
   const askConfirm = (message, onConfirm) => setConfirmState({ message, onConfirm });
   const [account, setAccount] = useState(stored.account ?? { name: "", email: "", password: "" });
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const importInputRef = useRef(null);
 
 
   const [weightLogs, setWeightLogs] = useState(stored.weightLogs ?? []);
@@ -1189,8 +1192,8 @@ export default function NutriDash() {
     setShowCustomForm(false);
     setCustomError("");
   }
-  function addFoodFromPicker(food) {
-    const grams = pickerGrams[food.id] ?? 100;
+  function addFoodFromPicker(food, gramsOverride) {
+    const grams = gramsOverride ?? pickerGrams[food.id] ?? 100;
     if (!grams || grams <= 0) return;
     const factor = grams / 100;
     const item = { id: uid(), name: food.name, grams, kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor, icon: food.icon, image: food.image };
@@ -1586,6 +1589,85 @@ export default function NutriDash() {
   }
 
   const filteredCatalog = catalog.filter((e) => e.name.toLowerCase().includes(exerciseSearch.toLowerCase()));
+
+  /** Junta todo el estado persistido de la app en un solo objeto (misma forma que se guarda en localStorage). */
+  function collectAllData() {
+    return {
+      profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates,
+      nutritionDate, nutritionHistory,
+      catalog, blocks, weeks, days, dayExercises, sets,
+    };
+  }
+
+  function exportToJson() {
+    const blob = new Blob([JSON.stringify(collectAllData(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `TestApp_Backup_${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Copia de seguridad descargada");
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo después
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(reader.result);
+      } catch {
+        toast("El archivo no es un JSON válido");
+        return;
+      }
+      if (!parsed || typeof parsed !== "object" || !("profile" in parsed || "meals" in parsed)) {
+        toast("Ese archivo no tiene el formato de un respaldo de la app");
+        return;
+      }
+      askConfirm("¿Deseas restaurar esta copia de seguridad? Se reemplazarán los datos actuales.", () => applyImportedData(parsed));
+    };
+    reader.readAsText(file);
+  }
+
+  function applyImportedData(d) {
+    setProfile(d.profile ?? profile);
+    setSteps(d.steps ?? steps);
+    setGymDays(d.gymDays ?? gymDays);
+    setActivityMode(d.activityMode ?? activityMode);
+    setGeneralActivityLevel(d.generalActivityLevel ?? generalActivityLevel);
+    setGoal(d.goal ?? goal);
+    setDeficitAmount(d.deficitAmount ?? deficitAmount);
+    setSurplusAmount(d.surplusAmount ?? surplusAmount);
+    setProteinPerKg(d.proteinPerKg ?? proteinPerKg);
+    setFatPercent(d.fatPercent ?? fatPercent);
+    setFoods(d.foods ?? foods);
+    setMealTemplates(d.mealTemplates ?? mealTemplates);
+    setMealCount(d.mealCount ?? mealCount);
+    setMeals(d.meals ?? meals);
+    setAccount(d.account ?? account);
+    setWeightLogs(d.weightLogs ?? weightLogs);
+    setMeasurementLogs(d.measurementLogs ?? measurementLogs);
+    setMeasurementFreq(d.measurementFreq ?? measurementFreq);
+    setRecentFoodIds(d.recentFoodIds ?? recentFoodIds);
+    setStepsCompletedDates(d.stepsCompletedDates ?? stepsCompletedDates);
+    setNutritionDate(d.nutritionDate ?? nutritionDate);
+    setNutritionHistory(d.nutritionHistory ?? nutritionHistory);
+    setCatalog(d.catalog ?? catalog);
+    setBlocks(d.blocks ?? blocks);
+    setWeeks(d.weeks ?? weeks);
+    setDays(d.days ?? days);
+    setDayExercises(d.dayExercises ?? dayExercises);
+    setSets(d.sets ?? sets);
+    setShowAccountModal(false);
+    setAppView("inicio");
+    toast("Datos restaurados con éxito");
+  }
 
   useEffect(() => {
     const data = {
@@ -2568,7 +2650,7 @@ export default function NutriDash() {
                 {recentFoodIds.map((id) => foods.find((f) => f.id === id)).filter(Boolean).map((f) => (
                   <button
                     key={f.id}
-                    onClick={() => addFoodFromPicker(f)}
+                    onClick={() => { setRecentPortionFood(f); setRecentPortionDraft(String(pickerGrams[f.id] ?? 100)); }}
                     style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 66, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 4px", cursor: "pointer" }}
                   >
                     <FoodIcon food={f} size={30} />
@@ -2673,6 +2755,47 @@ export default function NutriDash() {
           <Field label="Contraseña">
             <input type="password" style={selectStyle} value={account.password} onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))} placeholder="••••••••" />
           </Field>
+
+          <div style={{ marginTop: 8, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Respaldo de datos</div>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+              Descarga toda tu información (perfil, nutrición, entrenamiento, medidas) para guardarla o pasarla a otro dispositivo.
+            </div>
+            <button onClick={exportToJson} style={{ ...primaryButtonStyle, marginBottom: 8 }}>
+              <Download size={16} /> Exportar datos (copia de seguridad)
+            </button>
+            <button onClick={() => importInputRef.current?.click()} style={dashedButtonStyle}>
+              <Upload size={15} /> Importar datos (restaurar)
+            </button>
+            <input ref={importInputRef} type="file" accept="application/json" onChange={handleImportFile} style={{ display: "none" }} />
+          </div>
+        </ModalShell>
+      )}
+
+      {/* -------------------- MODAL: PORCIÓN (desde "Usados recientemente") -------------------- */}
+      {recentPortionFood && (
+        <ModalShell title={`Cantidad de ${recentPortionFood.name}`} onClose={() => setRecentPortionFood(null)}>
+          <Field label="Gramos">
+            <input type="number" style={inputStyle} value={recentPortionDraft} onChange={(e) => setRecentPortionDraft(e.target.value)} />
+          </Field>
+          {(() => {
+            const g = Number(recentPortionDraft) || 0;
+            const factor = g / 100;
+            return (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, marginBottom: 14, color: "var(--text-dim)" }}>
+                <span style={{ color: "var(--text)" }}>{round(recentPortionFood.kcal * factor)} kcal</span>
+                <span style={{ color: "var(--protein)" }}>P {round(recentPortionFood.p * factor)}g</span>
+                <span style={{ color: "var(--carbs)" }}>C {round(recentPortionFood.c * factor)}g</span>
+                <span style={{ color: "var(--fat)" }}>G {round(recentPortionFood.f * factor)}g</span>
+              </div>
+            );
+          })()}
+          <button
+            onClick={() => addFoodFromPicker(recentPortionFood, Number(recentPortionDraft))}
+            style={primaryButtonStyle}
+          >
+            <Plus size={16} /> Agregar
+          </button>
         </ModalShell>
       )}
 
