@@ -174,6 +174,16 @@ const MUSCLE_GROUPS = [
   "Pecho", "Hombro", "Bíceps", "Tríceps", "Abdomen",
 ];
 
+/** Filtro rápido de ejercicios: categorías amplias -> subgrupos musculares reales que agrupan. */
+const MUSCLE_FILTER_GROUPS = {
+  "Pecho": ["Pecho"],
+  "Espalda": ["Dorsales", "Espalda Alta/Trapecios", "Espalda Baja/Lumbares"],
+  "Pierna": ["Cuádriceps", "Isquiotibiales/Femoral", "Glúteos", "Aductores/Abductores", "Gemelos/Pantorrillas"],
+  "Hombro": ["Hombro"],
+  "Brazo": ["Bíceps", "Tríceps"],
+  "Core": ["Abdomen"],
+};
+
 /* ---- Medidas corporales: campo, etiqueta y frecuencia recomendada (días) ---- */
 const MEASUREMENT_FIELDS = [
   { key: "pecho", label: "Pecho", freqDays: 14 },
@@ -1016,6 +1026,7 @@ export default function NutriDash() {
 
   const [pickerMeal, setPickerMeal] = useState(null);
   const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerCategoryFilter, setPickerCategoryFilter] = useState(null); // null | 'proteina' | 'carbohidrato' | 'grasa'
   const [pickerGrams, setPickerGrams] = useState({});
   const [recentFoodIds, setRecentFoodIds] = useState(stored.recentFoodIds ?? []);
   const [recentPortionFood, setRecentPortionFood] = useState(null);
@@ -1090,6 +1101,7 @@ export default function NutriDash() {
 
   const [exercisePickerDayId, setExercisePickerDayId] = useState(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
+  const [exerciseMuscleFilter, setExerciseMuscleFilter] = useState(null); // null | 'Pecho' | 'Espalda' | 'Pierna' | 'Hombro' | 'Brazo' | 'Core'
   const [variantDrafts, setVariantDrafts] = useState({});
   const [showCustomExerciseForm, setShowCustomExerciseForm] = useState(false);
   const [customExerciseForm, setCustomExerciseForm] = useState({ name: "", muscleGroup: MUSCLE_GROUPS[0] });
@@ -1115,9 +1127,10 @@ export default function NutriDash() {
   const targetFat = (targetCalories * (fatPercent / 100)) / 9;
   const targetCarbs = Math.max(0, (targetCalories - targetProtein * 4 - targetFat * 9) / 4);
 
+  /** Solo las comidas marcadas con el check cuentan como "consumidas" — el resto queda pendiente aunque tengan alimentos. */
   const totals = useMemo(() => {
     let kcal = 0, p = 0, c = 0, f = 0;
-    meals.forEach((meal) => meal.items.forEach((it) => { kcal += it.kcal; p += it.p; c += it.c; f += it.f; }));
+    meals.filter((meal) => meal.completed).forEach((meal) => meal.items.forEach((it) => { kcal += it.kcal; p += it.p; c += it.c; f += it.f; }));
     return { kcal, p, c, f };
   }, [meals]);
 
@@ -1189,6 +1202,7 @@ export default function NutriDash() {
   function openPicker(mealId) {
     setPickerMeal(mealId);
     setPickerSearch("");
+    setPickerCategoryFilter(null);
     setShowCustomForm(false);
     setCustomError("");
   }
@@ -1225,7 +1239,10 @@ export default function NutriDash() {
     setShowCustomForm(false);
   }
 
-  const filteredFoods = foods.filter((f) => f.name.toLowerCase().includes(pickerSearch.toLowerCase()));
+  const filteredFoods = foods.filter((f) =>
+    f.name.toLowerCase().includes(pickerSearch.toLowerCase()) &&
+    (!pickerCategoryFilter || foodCategory(f) === pickerCategoryFilter)
+  );
 
   /* ---------------------------------------------------------
      FASE 2 — funciones de entrenamiento
@@ -1588,7 +1605,10 @@ export default function NutriDash() {
     setSets((prev) => prev.filter((s) => s.id !== setId));
   }
 
-  const filteredCatalog = catalog.filter((e) => e.name.toLowerCase().includes(exerciseSearch.toLowerCase()));
+  const filteredCatalog = catalog.filter((e) =>
+    e.name.toLowerCase().includes(exerciseSearch.toLowerCase()) &&
+    (!exerciseMuscleFilter || e.targets?.some((t) => MUSCLE_FILTER_GROUPS[exerciseMuscleFilter].includes(t.group)))
+  );
 
   /** Junta todo el estado persistido de la app en un solo objeto (misma forma que se guarda en localStorage). */
   function collectAllData() {
@@ -2356,7 +2376,7 @@ export default function NutriDash() {
                   );
                 })}
 
-                <button onClick={() => { setExercisePickerDayId(day.id); setExerciseSearch(""); setShowCustomExerciseForm(false); }} style={dashedButtonStyle}>
+                <button onClick={() => { setExercisePickerDayId(day.id); setExerciseSearch(""); setExerciseMuscleFilter(null); setShowCustomExerciseForm(false); }} style={dashedButtonStyle}>
                   <Plus size={16} /> Agregar ejercicio
                 </button>
               </>
@@ -2661,9 +2681,30 @@ export default function NutriDash() {
             </div>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 10 }}>
             <Search size={15} color="var(--text-dim)" />
             <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+          </div>
+
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
+            {[{ value: null, label: "Todos" }, ...MACRO_CATEGORIES].map((opt) => {
+              const active = pickerCategoryFilter === opt.value;
+              return (
+                <button
+                  key={opt.label}
+                  onClick={() => setPickerCategoryFilter(opt.value)}
+                  style={{
+                    flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 20,
+                    border: `1px solid ${active ? (opt.color || "var(--accent)") : "var(--border)"}`,
+                    background: active ? `${opt.color || "var(--accent)"}22` : "var(--panel2)",
+                    color: active ? (opt.color || "var(--accent)") : "var(--text-dim)",
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  {opt.value && <CategoryIcon category={opt.value} size={13} />} {opt.label}
+                </button>
+              );
+            })}
           </div>
 
           <button onClick={() => setShowCustomForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 12 }}>
@@ -2960,9 +3001,30 @@ export default function NutriDash() {
       {/* -------------------- MODAL: AGREGAR EJERCICIO -------------------- */}
       {exercisePickerDayId && (
         <ModalShell title="Agregar ejercicio" onClose={() => setExercisePickerDayId(null)} wide>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 10 }}>
             <Search size={15} color="var(--text-dim)" />
             <input value={exerciseSearch} onChange={(e) => setExerciseSearch(e.target.value)} placeholder="Buscar ejercicio..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+          </div>
+
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
+            {[null, ...Object.keys(MUSCLE_FILTER_GROUPS)].map((g) => {
+              const active = exerciseMuscleFilter === g;
+              return (
+                <button
+                  key={g ?? "todos"}
+                  onClick={() => setExerciseMuscleFilter(g)}
+                  style={{
+                    flexShrink: 0, padding: "6px 12px", borderRadius: 20,
+                    border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                    background: active ? "var(--accent)22" : "var(--panel2)",
+                    color: active ? "var(--accent)" : "var(--text-dim)",
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  {g ?? "Todos"}
+                </button>
+              );
+            })}
           </div>
 
           <button onClick={() => setShowCustomExerciseForm((s) => !s)} style={{ width: "100%", padding: "10px", borderRadius: 9, border: "1px dashed var(--border)", background: "transparent", color: "var(--accent2)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 12 }}>
