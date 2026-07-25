@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -804,6 +804,133 @@ function ModalShell({ title, onClose, children, wide }) {
   );
 }
 
+/** Diálogo genérico "¿Estás seguro?" — usado por todas las acciones de eliminación de la app. */
+function ConfirmDialog({ message, onCancel, onConfirm }) {
+  return (
+    <div onClick={onCancel} style={{ position: "fixed", inset: 0, background: "rgba(5,7,11,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 24 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 16, padding: 20, width: "100%", maxWidth: 340, boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <AlertTriangle size={18} color="var(--danger)" />
+          <div style={{ fontWeight: 700, fontSize: 15, fontFamily: "'Rajdhani', sans-serif" }}>Confirmar eliminación</div>
+        </div>
+        <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 18, lineHeight: 1.5 }}>{message}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: "10px", borderRadius: 9, border: "1px solid var(--border)", background: "transparent", color: "var(--text)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: "10px", borderRadius: 9, border: "none", background: "var(--danger)", color: "#0A0810", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Confirmar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Cronómetro de descanso flotante y compacto — inicio/pausa/reinicio + accesos +30s / +1m. */
+const timerBtnStyle = { flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", color: "var(--text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" };
+
+function RestTimer() {
+  const [seconds, setSeconds] = useState(90);
+  const [running, setRunning] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!running || seconds <= 0) return;
+    const t = setInterval(() => setSeconds((s) => Math.max(s - 1, 0)), 1000);
+    return () => clearInterval(t);
+  }, [running, seconds]);
+
+  useEffect(() => {
+    if (running && seconds === 0) {
+      setRunning(false);
+      if (navigator.vibrate) navigator.vibrate(200);
+    }
+  }, [seconds, running]);
+
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+
+  return (
+    <div style={{ position: "fixed", bottom: 18, right: 18, zIndex: 40 }}>
+      {expanded && (
+        <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.45)", width: 172 }}>
+          <div style={{ textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: seconds === 0 ? "var(--danger)" : "var(--text)", marginBottom: 10 }}>{mm}:{ss}</div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+            <button onClick={() => setSeconds((s) => s + 30)} style={timerBtnStyle}>+30s</button>
+            <button onClick={() => setSeconds((s) => s + 60)} style={timerBtnStyle}>+1m</button>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setRunning((r) => !r)} style={{ ...timerBtnStyle, flex: 2, background: "var(--accent)", color: "#07060B", border: "none" }}>{running ? "Pausar" : "Iniciar"}</button>
+            <button onClick={() => { setRunning(false); setSeconds(90); }} style={timerBtnStyle}><RotateCcw size={13} /></button>
+          </div>
+        </div>
+      )}
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        style={{ width: 52, height: 52, borderRadius: "50%", border: "none", background: running ? "var(--accent)" : "var(--panel)", boxShadow: "0 6px 18px rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: running ? "#07060B" : "var(--text)", marginLeft: "auto" }}
+        title="Cronómetro de descanso"
+      >
+        {expanded ? <X size={20} /> : <TimerIcon size={20} />}
+      </button>
+    </div>
+  );
+}
+
+/** Calendario mensual de consistencia: colorea cada día según cuántas de las 3 misiones se cumplieron. */
+const CAL_LEVEL_STYLE = {
+  excelente: { background: "var(--accent2)", color: "#07060B" },
+  parcial: { background: "var(--fat)", color: "#07060B" },
+  ninguna: { background: "var(--danger)33", color: "var(--danger)" },
+};
+function ConsistencyCalendar({ getDayStatus }) {
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const startWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = todayISO();
+  const monthLabel = viewDate.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+
+  const cells = [...Array(startWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <button onClick={() => setViewDate(new Date(year, month - 1, 1))} style={iconBtnStyle}><ChevronLeft size={14} /></button>
+        <div style={{ fontSize: 12.5, fontWeight: 700, textTransform: "capitalize" }}>{monthLabel}</div>
+        <button onClick={() => setViewDate(new Date(year, month + 1, 1))} style={iconBtnStyle}><ChevronRight size={14} /></button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+        {["D", "L", "M", "M", "J", "V", "S"].map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 9, color: "var(--text-dim)" }}>{d}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const status = dateStr <= todayStr ? getDayStatus(dateStr) : null;
+          const style = status ? CAL_LEVEL_STYLE[status.level] : { background: "var(--panel2)", color: "var(--text-dim)" };
+          return (
+            <div
+              key={i}
+              title={status ? `${status.met}/3 misiones` : "Sin datos"}
+              style={{
+                aspectRatio: "1", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
+                border: dateStr === todayStr ? "1.5px solid var(--accent)" : "1px solid var(--border)",
+                ...style,
+              }}
+            >
+              {d}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 12, marginTop: 10, fontSize: 10, color: "var(--text-dim)", flexWrap: "wrap" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--accent2)", display: "inline-block" }} />Excelente (3/3)</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--fat)", display: "inline-block" }} />Parcial (1-2)</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--danger)33", border: "1px solid var(--danger)", display: "inline-block" }} />Ninguna</span>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------
    APP PRINCIPAL
 --------------------------------------------------------- */
@@ -864,9 +991,16 @@ export default function NutriDash() {
     setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, completed: !m.completed } : m)));
   }
 
+  /** Misión 3: marca/desmarca el cumplimiento de pasos de HOY, acumulando historial para el calendario. */
+  function toggleStepsToday() {
+    const today = todayISO();
+    setStepsCompletedDates((prev) => (prev.includes(today) ? prev.filter((d) => d !== today) : [...prev, today]));
+  }
+
   const [pickerMeal, setPickerMeal] = useState(null);
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerGrams, setPickerGrams] = useState({});
+  const [recentFoodIds, setRecentFoodIds] = useState(stored.recentFoodIds ?? []);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customForm, setCustomForm] = useState({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
   const [customError, setCustomError] = useState("");
@@ -874,6 +1008,16 @@ export default function NutriDash() {
 
   /* ---- Fase 2: entrenamiento + Fase 3: navegación e identidad ---- */
   const [appView, setAppView] = useState("inicio"); // 'inicio' | 'perfil' | 'nutricion' | 'entrenamiento'
+  const [confirmState, setConfirmState] = useState(null); // {message, onConfirm}
+  const [toastMsg, setToastMsg] = useState(null);
+  const toastTimerRef = useRef(null);
+  function toast(msg) {
+    clearTimeout(toastTimerRef.current);
+    setToastMsg(msg);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 2000);
+  }
+  const [stepsCompletedDates, setStepsCompletedDates] = useState(stored.stepsCompletedDates ?? (stored.stepsCompletedDate ? [stored.stepsCompletedDate] : [])); // Misión 3: fechas en que se marcó cumplida la meta de pasos
+  const askConfirm = (message, onConfirm) => setConfirmState({ message, onConfirm });
   const [account, setAccount] = useState(stored.account ?? { name: "", email: "", password: "" });
   const [showAccountModal, setShowAccountModal] = useState(false);
 
@@ -920,8 +1064,9 @@ export default function NutriDash() {
   const [addDayWeekId, setAddDayWeekId] = useState(null);
   const [addDayDate, setAddDayDate] = useState(todayISO());
   const [addDayName, setAddDayName] = useState("");
+  const [addDayIsRest, setAddDayIsRest] = useState(false);
   const [editDayItem, setEditDayItem] = useState(null);
-  const [editDayDraft, setEditDayDraft] = useState({ name: "", date: "" });
+  const [editDayDraft, setEditDayDraft] = useState({ name: "", date: "", isRestDay: false });
 
   const [exercisePickerDayId, setExercisePickerDayId] = useState(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
@@ -1007,12 +1152,15 @@ export default function NutriDash() {
     setMealTemplates((prev) => [template, ...prev]);
     setSaveTemplateMealId(null);
     setTemplateNameDraft("");
+    toast(`Plantilla "${template.name}" guardada`);
   }
 
   /** Aplica una plantilla guardada a una comida: agrega sus ingredientes con ids nuevos. */
   function applyTemplate(mealId, template) {
     const items = template.items.map((i) => ({ ...i, id: uid() }));
     setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, items: [...m.items, ...items] } : m)));
+    setTemplatePickerMealId(null);
+    toast(`"${template.name}" agregada a la comida`);
   }
 
   function deleteTemplate(templateId) {
@@ -1030,6 +1178,11 @@ export default function NutriDash() {
     const factor = grams / 100;
     const item = { id: uid(), name: food.name, grams, kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor, icon: food.icon, image: food.image };
     setMeals((prev) => prev.map((m) => (m.id === pickerMeal ? { ...m, items: [...m.items, item] } : m)));
+    setRecentFoodIds((prev) => [food.id, ...prev.filter((id) => id !== food.id)].slice(0, 8));
+    setPickerMeal(null);
+    setPickerSearch("");
+    setPickerGrams({});
+    toast(`"${food.name}" agregado correctamente`);
   }
   function handleImageSelect(e) {
     const file = e.target.files?.[0];
@@ -1046,6 +1199,7 @@ export default function NutriDash() {
     const factor = 100 / Number(portion);
     const newFood = { id: uid(), name: name.trim(), kcal: Number(kcal) * factor, p: Number(p) * factor, c: Number(c) * factor, f: Number(f) * factor, custom: true, image: image || null, category };
     setFoods((prev) => [newFood, ...prev]);
+    addFoodFromPicker(newFood); // se agrega directo a la comida y cierra el modal + toast
     setCustomForm({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
     setCustomError("");
     setShowCustomForm(false);
@@ -1082,6 +1236,10 @@ export default function NutriDash() {
       return [...prev, { id: uid(), date, unit: measurementUnit, values }];
     });
     setMeasurementDraft({});
+    toast("Medidas guardadas correctamente");
+  }
+  function removeMeasurementLog(id) {
+    setMeasurementLogs((prev) => prev.filter((m) => m.id !== id));
   }
 
   /** Última fecha registrada para un campo + si ya toca volver a medir. */
@@ -1100,6 +1258,7 @@ export default function NutriDash() {
     setActiveBlockId(block.id);
     setShowNewBlockModal(false);
     setNewBlockForm({ name: "", startDate: todayISO(), endDate: "", goal: "mantenimiento" });
+    toast(`Bloque "${block.name}" creado`);
   }
 
   function updateBlock(blockId, fields) {
@@ -1109,18 +1268,21 @@ export default function NutriDash() {
     if (!editBlockId || !editBlockForm.name.trim() || !editBlockForm.startDate) return;
     updateBlock(editBlockId, { name: editBlockForm.name.trim(), startDate: editBlockForm.startDate, endDate: editBlockForm.endDate || null });
     setEditBlockId(null);
+    toast("Bloque actualizado");
   }
   function confirmNewWeek() {
     if (!newWeekBlockId) return;
     addWeek(newWeekBlockId, newWeekName);
     setNewWeekBlockId(null);
     setNewWeekName("");
+    toast("Semana agregada");
   }
   function confirmDuplicateWeek() {
     if (!duplicateWeekId) return;
     duplicateWeek(duplicateWeekId, duplicateWeekName);
     setDuplicateWeekId(null);
     setDuplicateWeekName("");
+    toast("Semana duplicada");
   }
 
   /** Elimina un bloque completo junto con sus semanas, días, ejercicios y series. */
@@ -1135,6 +1297,7 @@ export default function NutriDash() {
     setSets((prev) => prev.filter((s) => !exIds.includes(s.dayExerciseId)));
     if (activeBlockId === blockId) setActiveBlockId(null);
     setConfirmDeleteBlockId(null);
+    toast("Bloque eliminado");
   }
 
   /** Clona semanas/días/ejercicios de un bloque a uno nuevo (sin series ni referencias al original). */
@@ -1149,7 +1312,7 @@ export default function NutriDash() {
       const newWeek = { id: uid(), blockId: newBlock.id, order: w.order, label: w.label, clonedFromWeekId: null };
       newWeeks.push(newWeek);
       getDaysForWeek(w.id).forEach((d) => {
-        const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(d.date, delta), order: d.order, name: d.name };
+        const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(d.date, delta), order: d.order, name: d.name, completed: false, isRestDay: !!d.isRestDay };
         newDays.push(newDay);
         getExercisesForDay(d.id).forEach((ex) => {
           newExercises.push({ id: uid(), dayId: newDay.id, catalogExerciseId: ex.catalogExerciseId, variantName: ex.variantName, order: ex.order, sourceDayExerciseId: null });
@@ -1162,6 +1325,7 @@ export default function NutriDash() {
     setDayExercises((prev) => [...prev, ...newExercises]);
     setActiveBlockId(newBlock.id);
     setDuplicateBlockId(null);
+    toast(`Bloque "${newBlock.name}" creado a partir de la copia`);
   }
 
   function updateBlockGoal(blockId, newGoal) {
@@ -1222,6 +1386,28 @@ export default function NutriDash() {
     return { day: future, when };
   }
 
+  /**
+   * Estado de las 3 misiones para una fecha dada.
+   * - Nutrición: usa nutritionHistory (días pasados) o `totals` en vivo si es el día actual. Si no hay datos, la fecha queda "sin datos" (no se colorea).
+   * - Entrenamiento: si no hay día programado, o es de descanso, o está marcado completado -> cumplida (no rompe la racha en libres/descanso).
+   * - Pasos: fecha presente en stepsCompletedDates.
+   */
+  function getDayMissionStatus(dateStr) {
+    const nutriTotals = dateStr === nutritionDate ? totals : nutritionHistory.find((h) => h.date === dateStr)?.totals;
+    if (!nutriTotals) return null;
+
+    const tol = Math.max(100, targetCalories * 0.05);
+    const nutritionMet = Math.abs(nutriTotals.kcal - targetCalories) <= tol;
+
+    const scheduledDay = days.find((d) => d.date === dateStr);
+    const trainingMet = !scheduledDay || scheduledDay.isRestDay || !!scheduledDay.completed;
+
+    const stepsMet = stepsCompletedDates.includes(dateStr);
+
+    const met = [nutritionMet, trainingMet, stepsMet].filter(Boolean).length;
+    return { met, nutritionMet, trainingMet, stepsMet, level: met === 3 ? "excelente" : met > 0 ? "parcial" : "ninguna" };
+  }
+
   function addWeek(blockId, name) {
     const order = getWeeksForBlock(blockId).length;
     const week = { id: uid(), blockId, order, label: (name || "").trim() || `Semana ${order + 1}`, clonedFromWeekId: null };
@@ -1258,7 +1444,7 @@ export default function NutriDash() {
     const newDayExercises = [];
 
     sourceDays.forEach((sourceDay) => {
-      const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(sourceDay.date, 7), order: sourceDay.order };
+      const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(sourceDay.date, 7), order: sourceDay.order, completed: false, isRestDay: !!sourceDay.isRestDay };
       newDays.push(newDay);
       getExercisesForDay(sourceDay.id).forEach((sourceEx) => {
         newDayExercises.push({
@@ -1281,22 +1467,29 @@ export default function NutriDash() {
   function confirmAddDay() {
     if (!addDayWeekId || !addDayDate) return;
     const order = getDaysForWeek(addDayWeekId).length;
-    const day = { id: uid(), weekId: addDayWeekId, date: addDayDate, order, name: addDayName.trim() || `Día ${order + 1}` };
+    const day = { id: uid(), weekId: addDayWeekId, date: addDayDate, order, name: addDayName.trim() || (addDayIsRest ? "Descanso" : `Día ${order + 1}`), completed: false, isRestDay: addDayIsRest };
     setDays((prev) => [...prev, day]);
     setAddDayWeekId(null);
     setAddDayName("");
+    setAddDayIsRest(false);
+    toast(`"${day.name}" agregado`);
   }
 
   function renameDay(dayId, name) {
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, name } : d)));
   }
-  function editDay(dayId, { name, date }) {
-    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, name, date } : d)));
+  function editDay(dayId, { name, date, isRestDay }) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, name, date, isRestDay } : d)));
+  }
+  /** Misión 2: marca/desmarca el entrenamiento del día como completado. Sin efecto en días de descanso (ya cuentan solos). */
+  function toggleDayCompleted(dayId) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, completed: !d.completed } : d)));
   }
   function confirmEditDay() {
     if (!editDayItem) return;
     editDay(editDayItem.dayId, editDayDraft);
     setEditDayItem(null);
+    toast("Día actualizado");
   }
 
   /** Elimina un día completo junto con sus ejercicios y series. */
@@ -1322,6 +1515,10 @@ export default function NutriDash() {
     const order = getExercisesForDay(exercisePickerDayId).length;
     const newEx = { id: uid(), dayId: exercisePickerDayId, catalogExerciseId: catalogEx.id, variantName, order, sourceDayExerciseId: null };
     setDayExercises((prev) => [...prev, newEx]);
+    setExercisePickerDayId(null);
+    setExerciseSearch("");
+    setVariantDrafts({});
+    toast(`"${variantName}" añadido a la rutina`);
   }
 
   function addCustomCatalogExercise() {
@@ -1329,6 +1526,7 @@ export default function NutriDash() {
     if (!name.trim()) return;
     const entry = { id: uid(), name: name.trim(), targets: t1(muscleGroup), isCustom: true };
     setCatalog((prev) => [entry, ...prev]);
+    addExerciseFromPicker(entry); // se agrega directo al día y cierra el modal + toast
     setCustomExerciseForm({ name: "", muscleGroup: MUSCLE_GROUPS[0] });
     setShowCustomExerciseForm(false);
   }
@@ -1375,13 +1573,13 @@ export default function NutriDash() {
   useEffect(() => {
     const data = {
       profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates,
       nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
   }, [profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates,
       nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets]);
 
@@ -1440,20 +1638,41 @@ export default function NutriDash() {
             const overBudget = totals.kcal > targetCalories;
             const mealsDone = meals.filter((m) => m.completed).length;
             const nextWorkout = getNextWorkoutDay();
+
+            // Misión 1 — Nutrición: tolerancia ±100 kcal o ±5% del objetivo, lo que sea mayor.
+            const kcalTolerance = Math.max(100, targetCalories * 0.05);
+            const nutritionMissionDone = Math.abs(totals.kcal - targetCalories) <= kcalTolerance;
+
+            // Misión 2 — Entrenamiento: ¿el día de hoy (si existe) está marcado como completado?
+            const todaysWorkout = nextWorkout?.when === "Hoy" ? nextWorkout.day : null;
+            const trainingMissionDone = !!todaysWorkout?.completed;
+
+            // Misión 3 — Pasos: se compara contra la fecha de hoy, se "resetea" solo cada día.
+            const stepsMissionDone = stepsCompletedDates.includes(todayISO());
+
             return (
               <>
-                <Panel>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-                    <UtensilsCrossed size={14} color="var(--accent)" /> Hoy en nutrición
+                <Panel style={nutritionMissionDone ? { border: "1px solid var(--accent2)66" } : undefined}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                      <UtensilsCrossed size={14} color="var(--accent)" /> Hoy en nutrición
+                    </div>
+                    {nutritionMissionDone && <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--accent2)" }}><CheckCircle2 size={14} /> Misión cumplida</span>}
                   </div>
-                  {overBudget ? (
+                  {overBudget && !nutritionMissionDone ? (
                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
                   ) : (
                     <div style={{ fontSize: 14, fontWeight: 700, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-                      Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> ·
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={13} /> {round(pLeft)}g</span> ·
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={13} /> {round(cLeft)}g</span> ·
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={13} /> {round(fLeft)}g</span>
+                      {nutritionMissionDone ? (
+                        <span style={{ color: "var(--accent2)" }}>Dentro de tu rango de {round(kcalTolerance)} kcal ✓</span>
+                      ) : (
+                        <>
+                          Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> ·
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={13} /> {round(pLeft)}g</span> ·
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={13} /> {round(cLeft)}g</span> ·
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={13} /> {round(fLeft)}g</span>
+                        </>
+                      )}
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
@@ -1461,21 +1680,57 @@ export default function NutriDash() {
                   </div>
                 </Panel>
 
-                <Panel>
+                <Panel style={trainingMissionDone ? { border: "1px solid var(--accent2)66" } : undefined}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
                     <Dumbbell size={14} color="var(--accent)" /> Entrenamiento
                   </div>
                   {nextWorkout ? (
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                      Próximo entreno: <span style={{ color: "var(--accent2)" }}>{nextWorkout.when} — {nextWorkout.day.name || "Día"}</span>
-                    </div>
+                    trainingMissionDone ? (
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--accent2)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <CheckCircle2 size={15} /> ¡Entrenamiento de hoy logrado! — {nextWorkout.day.name || "Día"}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                        Próximo entreno: <span style={{ color: "var(--accent2)" }}>{nextWorkout.when} — {nextWorkout.day.name || "Día"}</span>
+                      </div>
+                    )
                   ) : (
                     <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No tienes días de entrenamiento programados.</div>
                   )}
+                  {todaysWorkout && (
+                    <button
+                      onClick={() => toggleDayCompleted(todaysWorkout.id)}
+                      style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: trainingMissionDone ? "var(--accent2)" : "var(--panel2)", color: trainingMissionDone ? "#07060B" : "var(--text-dim)" }}
+                    >
+                      {trainingMissionDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                      {trainingMissionDone ? "Completado hoy" : "Marcar como completado"}
+                    </button>
+                  )}
+                </Panel>
+
+                <Panel style={stepsMissionDone ? { border: "1px solid var(--accent2)66" } : undefined}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                    <Footprints size={14} color="var(--accent)" /> Pasos diarios
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 10 }}>Meta configurada en Datos: {steps.toLocaleString("es-MX")} pasos</div>
+                  <button
+                    onClick={toggleStepsToday}
+                    style={{ width: "100%", padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12.5, background: stepsMissionDone ? "var(--accent2)" : "var(--panel2)", color: stepsMissionDone ? "#07060B" : "var(--text-dim)" }}
+                  >
+                    {stepsMissionDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+                    {stepsMissionDone ? "Meta de pasos cumplida hoy ✓" : "¿Cumpliste tu meta de pasos hoy?"}
+                  </button>
                 </Panel>
               </>
             );
           })()}
+
+          <Panel>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 12, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+              <CalendarClock size={14} color="var(--accent)" /> Calendario de consistencia
+            </div>
+            <ConsistencyCalendar getDayStatus={getDayMissionStatus} />
+          </Panel>
 
           {[
             { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
@@ -1544,7 +1799,7 @@ export default function NutriDash() {
                       <SwipeableItem
                         key={item.id}
                         onSwipeRight={() => { setEditGramsItem({ mealId: meal.id, itemId: item.id }); setEditGramsDraft(String(item.grams)); }}
-                        onSwipeLeft={() => removeFromMeal(meal.id, item.id)}
+                        onSwipeLeft={() => askConfirm(`¿Eliminar "${item.name}" de esta comida?`, () => removeFromMeal(meal.id, item.id))}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)" }}>
                           <FoodIcon food={item} size={32} />
@@ -1707,6 +1962,7 @@ export default function NutriDash() {
         </div>
         )}
 
+        {appView === "entrenamiento" && <RestTimer />}
         {appView === "entrenamiento" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* -------- Lista de bloques -------- */}
@@ -1792,7 +2048,7 @@ export default function NutriDash() {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <button onClick={(e) => { e.stopPropagation(); setDuplicateWeekId(week.id); setDuplicateWeekName(`Copia de ${week.label}`); }} title="Duplicar semana" style={iconBtnStyle}><Copy size={14} /></button>
-                          <button onClick={(e) => { e.stopPropagation(); removeWeek(week.id); }} title="Eliminar semana" style={{ ...iconBtnStyle, color: "var(--danger)" }}><Trash2 size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); askConfirm(`¿Eliminar "${week.label}" y todos sus días/ejercicios?`, () => removeWeek(week.id)); }} title="Eliminar semana" style={{ ...iconBtnStyle, color: "var(--danger)" }}><Trash2 size={14} /></button>
                           {expanded ? <ChevronUp size={18} color="var(--text-dim)" /> : <ChevronDown size={18} color="var(--text-dim)" />}
                         </div>
                       </div>
@@ -1804,8 +2060,8 @@ export default function NutriDash() {
                             return (
                               <SwipeableItem
                                 key={day.id}
-                                onSwipeRight={() => { setEditDayItem({ dayId: day.id }); setEditDayDraft({ name: day.name || "", date: day.date }); }}
-                                onSwipeLeft={() => removeDay(day.id)}
+                                onSwipeRight={() => { setEditDayItem({ dayId: day.id }); setEditDayDraft({ name: day.name || "", date: day.date, isRestDay: !!day.isRestDay }); }}
+                                onSwipeLeft={() => askConfirm(`¿Eliminar el día "${day.name || "Día"}" y sus ejercicios?`, () => removeDay(day.id))}
                               >
                                 <div
                                   onClick={() => setSelectedDayId(day.id)}
@@ -1822,7 +2078,14 @@ export default function NutriDash() {
                                     <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{day.name || "Día"}</div>
                                   </div>
                                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text-dim)", flexShrink: 0 }}>
-                                    {dayExList.length} ej. <ChevronRight size={14} />
+                                    {day.isRestDay ? (
+                                      <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--accent2)", fontWeight: 700 }}><Moon size={13} /> Descanso</span>
+                                    ) : day.completed ? (
+                                      <CheckCircle2 size={15} color="var(--accent2)" />
+                                    ) : (
+                                      <span>{dayExList.length} ej.</span>
+                                    )}
+                                    <ChevronRight size={14} />
                                   </div>
                                 </div>
                               </SwipeableItem>
@@ -1895,8 +2158,25 @@ export default function NutriDash() {
                       onChange={(e) => setDays((prev) => prev.map((d) => (d.id === day.id ? { ...d, date: e.target.value } : d)))}
                       style={{ ...inputStyle, width: 140, flexShrink: 0, padding: "6px 8px", fontSize: 12.5 }}
                     />
-                    <button onClick={() => removeDay(day.id)} style={{ ...iconBtnStyle, flexShrink: 0, color: "var(--danger)" }}><Trash2 size={14} /></button>
+                    <button onClick={() => askConfirm(`¿Eliminar el día "${day.name || "Día"}" y sus ejercicios?`, () => removeDay(day.id))} style={{ ...iconBtnStyle, flexShrink: 0, color: "var(--danger)" }}><Trash2 size={14} /></button>
                   </div>
+                  {day.isRestDay ? (
+                    <div style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, background: "var(--accent2)1A", border: "1px solid var(--accent2)55", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13, color: "var(--accent2)" }}>
+                      <Moon size={16} /> Día de descanso — cuenta automático para tu misión de entrenamiento
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => toggleDayCompleted(day.id)}
+                      style={{
+                        marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, border: "none", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13,
+                        background: day.completed ? "var(--accent2)" : "var(--panel2)", color: day.completed ? "#07060B" : "var(--text-dim)",
+                      }}
+                    >
+                      {day.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                      {day.completed ? "Entrenamiento completado ✓" : "Marcar entrenamiento como completado"}
+                    </button>
+                  )}
                 </Panel>
 
                 {dayExList.map((ex, i) => {
@@ -1918,7 +2198,7 @@ export default function NutriDash() {
                         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                           <button onClick={() => moveExercise(day.id, ex.id, -1)} disabled={i === 0} style={{ ...iconBtnStyle, opacity: i === 0 ? 0.35 : 1 }}><ArrowUp size={13} /></button>
                           <button onClick={() => moveExercise(day.id, ex.id, 1)} disabled={i === dayExList.length - 1} style={{ ...iconBtnStyle, opacity: i === dayExList.length - 1 ? 0.35 : 1 }}><ArrowDown size={13} /></button>
-                          <button onClick={() => removeExercise(ex.id)} style={{ ...iconBtnStyle, color: "var(--danger)" }}><Trash2 size={13} /></button>
+                          <button onClick={() => askConfirm(`¿Eliminar "${ex.variantName}" de este día?`, () => removeExercise(ex.id))} style={{ ...iconBtnStyle, color: "var(--danger)" }}><Trash2 size={13} /></button>
                         </div>
                       </div>
 
@@ -2229,13 +2509,16 @@ export default function NutriDash() {
 
                 <div style={{ marginTop: 14 }}>
                   {[...measurementLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((m) => (
-                    <div key={m.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 4 }}>{formatDateEs(m.date)}</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
-                        {Object.entries(m.values).map(([k, v]) => (
-                          <span key={k}>{MEASUREMENT_FIELDS.find((f) => f.key === k)?.label}: {v}{m.unit}</span>
-                        ))}
+                    <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "8px 0", borderBottom: "1px solid var(--border)", gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 4 }}>{formatDateEs(m.date)}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                          {Object.entries(m.values).map(([k, v]) => (
+                            <span key={k}>{MEASUREMENT_FIELDS.find((f) => f.key === k)?.label}: {v}{m.unit}</span>
+                          ))}
+                        </div>
                       </div>
+                      <button onClick={() => askConfirm(`¿Eliminar las medidas del ${formatDateEs(m.date)}?`, () => removeMeasurementLog(m.id))} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 4, flexShrink: 0 }}><Trash2 size={14} /></button>
                     </div>
                   ))}
                 </div>
@@ -2249,6 +2532,24 @@ export default function NutriDash() {
       {/* -------------------- MODAL: AGREGAR ALIMENTO -------------------- */}
       {pickerMeal && (
         <ModalShell title={`Agregar a ${meals.find((m) => m.id === pickerMeal)?.name ?? ""}`} onClose={() => setPickerMeal(null)} wide>
+          {recentFoodIds.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10.5, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Usados recientemente</div>
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                {recentFoodIds.map((id) => foods.find((f) => f.id === id)).filter(Boolean).map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => addFoodFromPicker(f)}
+                    style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 66, background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 4px", cursor: "pointer" }}
+                  >
+                    <FoodIcon food={f} size={30} />
+                    <span style={{ fontSize: 9.5, color: "var(--text)", textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>{f.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
             <Search size={15} color="var(--text-dim)" />
             <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
@@ -2353,7 +2654,7 @@ export default function NutriDash() {
             <input type="number" style={inputStyle} value={editGramsDraft} onChange={(e) => setEditGramsDraft(e.target.value)} />
           </Field>
           <button
-            onClick={() => { updateItemGrams(editGramsItem.mealId, editGramsItem.itemId, Number(editGramsDraft)); setEditGramsItem(null); }}
+            onClick={() => { updateItemGrams(editGramsItem.mealId, editGramsItem.itemId, Number(editGramsDraft)); setEditGramsItem(null); toast("Cantidad actualizada"); }}
             style={primaryButtonStyle}
           >
             Guardar
@@ -2385,7 +2686,7 @@ export default function NutriDash() {
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 8 }}>{t.items.length} ingrediente{t.items.length !== 1 ? "s" : ""} · {round(kcal)} kcal</div>
                   <button
-                    onClick={() => { applyTemplate(templatePickerMealId, t); setTemplatePickerMealId(null); }}
+                    onClick={() => applyTemplate(templatePickerMealId, t)}
                     style={{ width: "100%", padding: "8px", borderRadius: 7, border: "none", background: "var(--accent2)", color: "#07060B", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
                   >
                     Usar esta comida
@@ -2473,6 +2774,13 @@ export default function NutriDash() {
           <Field label="Fecha">
             <input type="date" style={inputStyle} value={editDayDraft.date} onChange={(e) => setEditDayDraft((d) => ({ ...d, date: e.target.value }))} />
           </Field>
+          <Field label="Tipo de día">
+            <ToggleGroup
+              options={[{ value: false, label: "Entrenamiento" }, { value: true, label: "Descanso" }]}
+              value={editDayDraft.isRestDay}
+              onChange={(v) => setEditDayDraft((d) => ({ ...d, isRestDay: v }))}
+            />
+          </Field>
           <button onClick={confirmEditDay} style={primaryButtonStyle}>Guardar cambios</button>
         </ModalShell>
       )}
@@ -2480,8 +2788,15 @@ export default function NutriDash() {
       {/* -------------------- MODAL: AGREGAR DÍA -------------------- */}
       {addDayWeekId && (
         <ModalShell title="Agregar día" onClose={() => setAddDayWeekId(null)}>
+          <Field label="Tipo de día">
+            <ToggleGroup
+              options={[{ value: false, label: "Entrenamiento" }, { value: true, label: "Descanso" }]}
+              value={addDayIsRest}
+              onChange={setAddDayIsRest}
+            />
+          </Field>
           <Field label="Nombre">
-            <input style={selectStyle} value={addDayName} onChange={(e) => setAddDayName(e.target.value)} placeholder='Ej. "Empuje", "Pierna"' />
+            <input style={selectStyle} value={addDayName} onChange={(e) => setAddDayName(e.target.value)} placeholder={addDayIsRest ? 'Ej. "Descanso"' : 'Ej. "Empuje", "Pierna"'} />
           </Field>
           <Field label="Fecha">
             <input type="date" style={inputStyle} value={addDayDate} onChange={(e) => setAddDayDate(e.target.value)} />
@@ -2541,6 +2856,26 @@ export default function NutriDash() {
             {filteredCatalog.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-dim)", textAlign: "center", padding: "12px 0" }}>Sin resultados.</div>}
           </div>
         </ModalShell>
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          message={confirmState.message}
+          onCancel={() => setConfirmState(null)}
+          onConfirm={() => { confirmState.onConfirm(); setConfirmState(null); }}
+        />
+      )}
+
+      {toastMsg && (
+        <div style={{
+          position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 100,
+          background: "var(--panel)", border: "1px solid var(--accent2)", color: "var(--text)",
+          padding: "10px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 8,
+          maxWidth: "90vw", textAlign: "center",
+        }}>
+          <CheckCircle2 size={16} color="var(--accent2)" style={{ flexShrink: 0 }} /> {toastMsg}
+        </div>
       )}
     </div>
   );
