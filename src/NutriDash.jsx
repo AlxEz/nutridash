@@ -991,6 +991,23 @@ export default function NutriDash() {
     setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, completed: !m.completed } : m)));
   }
 
+  /** Suma los alimentos de un día del historial a las comidas de HOY (por posición de comida) y regresa a Nutrición. */
+  function copyHistoryDayToToday(day) {
+    setMeals((prev) => prev.map((m, i) => {
+      const histMeal = day.meals[i];
+      if (!histMeal || histMeal.items.length === 0) return m;
+      return { ...m, items: [...m.items, ...histMeal.items.map((it) => ({ ...it, id: uid() }))] };
+    }));
+    setHistoryOpenDate(null);
+    setAppView("nutricion");
+    toast(`Comidas del ${formatDateEs(day.date)} copiadas a hoy`);
+  }
+
+  function removeHistoryDay(date) {
+    setNutritionHistory((prev) => prev.filter((d) => d.date !== date));
+    toast(`Registro del ${formatDateEs(date)} eliminado`);
+  }
+
   /** Misión 3: marca/desmarca el cumplimiento de pasos de HOY, acumulando historial para el calendario. */
   function toggleStepsToday() {
     const today = todayISO();
@@ -1849,6 +1866,12 @@ export default function NutriDash() {
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{formatDateEs(day.date)}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--text-dim)" }}>{round(day.totals.kcal)} kcal</div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); askConfirm(`¿Eliminar el registro del ${formatDateEs(day.date)} del historial?`, () => removeHistoryDay(day.date)); }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2 }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                           {open ? <ChevronUp size={16} color="var(--text-dim)" /> : <ChevronDown size={16} color="var(--text-dim)" />}
                         </div>
                       </div>
@@ -1871,6 +1894,12 @@ export default function NutriDash() {
                               ))}
                             </div>
                           ))}
+                          <button
+                            onClick={() => askConfirm(`Esto sumará los alimentos del ${formatDateEs(day.date)} a las comidas de hoy (se agregan a lo que ya tengas registrado, no se borra nada). ¿Continuar?`, () => copyHistoryDayToToday(day))}
+                            style={{ ...dashedButtonStyle, marginTop: 6 }}
+                          >
+                            <Copy size={14} /> Usar estas comidas hoy
+                          </button>
                         </div>
                       )}
                     </div>
