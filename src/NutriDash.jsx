@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -929,44 +929,6 @@ const CAL_LEVEL_STYLE = {
   parcial: { background: "var(--fat)", color: "#07060B" },
   ninguna: { background: "var(--danger)33", color: "var(--danger)" },
 };
-/** Tira compacta de la semana actual (7 días, sin navegación) — usada en el Home. */
-const DOW_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
-function WeekStrip({ getDayStatus }) {
-  const today = new Date();
-  const mondayOffset = (today.getDay() + 6) % 7;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - mondayOffset);
-  const todayStr = todayISO();
-
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
-      {Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const status = dateStr <= todayStr ? getDayStatus(dateStr) : null;
-        const style = status ? CAL_LEVEL_STYLE[status.level] : { background: "var(--panel2)", color: "var(--text-dim)" };
-        const isToday = dateStr === todayStr;
-        return (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-            <span style={{ fontSize: 8.5, color: "var(--text-dim)" }}>{DOW_LETTERS[i]}</span>
-            <div
-              title={status ? `${status.met}/3 misiones` : "Sin datos"}
-              style={{
-                width: "100%", aspectRatio: "1", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
-                border: isToday ? "1.5px solid var(--accent)" : "1px solid var(--border)",
-                ...style,
-              }}
-            >
-              {d.getDate()}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function ConsistencyCalendar({ getDayStatus }) {
   const [viewDate, setViewDate] = useState(() => new Date());
@@ -1110,6 +1072,15 @@ export default function NutriDash() {
   const [recentFoodIds, setRecentFoodIds] = useState(stored.recentFoodIds ?? []);
   const [recentPortionFood, setRecentPortionFood] = useState(null);
   const [recentPortionDraft, setRecentPortionDraft] = useState("100");
+
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState(null);
+  const [scannedProduct, setScannedProduct] = useState(null);
+  const [scanPortionDraft, setScanPortionDraft] = useState("100");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const scanIntervalRef = useRef(null);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customForm, setCustomForm] = useState({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
   const [customError, setCustomError] = useState("");
@@ -1304,6 +1275,103 @@ export default function NutriDash() {
     reader.onload = () => setCustomForm((f) => ({ ...f, image: reader.result }));
     reader.readAsDataURL(file);
   }
+
+  /** Detiene la cámara y el ciclo de detección (al cerrar, cancelar o encontrar un producto). */
+  function stopBarcodeScanner() {
+    clearInterval(scanIntervalRef.current);
+    scanIntervalRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }
+
+  function closeScanner() {
+    stopBarcodeScanner();
+    setShowScanner(false);
+    setScanError(null);
+    setScannedProduct(null);
+    setScanLoading(false);
+  }
+
+  /** Consulta Open Food Facts (gratis, sin API key) con el código de barras detectado. */
+  async function fetchProductByBarcode(code) {
+    setScanLoading(true);
+    setScanError(null);
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+      const data = await res.json();
+      if (data.status !== 1 || !data.product) {
+        setScanError("No encontramos ese producto en la base de datos. Puedes agregarlo manualmente.");
+        setScanLoading(false);
+        return;
+      }
+      const n = data.product.nutriments || {};
+      const kcal = n["energy-kcal_100g"] ?? (n["energy_100g"] ? Number(n["energy_100g"]) / 4.184 : 0);
+      setScannedProduct({
+        name: data.product.product_name || data.product.generic_name || "Producto escaneado",
+        kcal: Number(kcal) || 0,
+        p: Number(n["proteins_100g"]) || 0,
+        c: Number(n["carbohydrates_100g"]) || 0,
+        f: Number(n["fat_100g"]) || 0,
+        image: data.product.image_front_small_url || data.product.image_url || null,
+      });
+      setScanPortionDraft("100");
+    } catch {
+      setScanError("No se pudo conectar con la base de datos de productos. Revisa tu internet.");
+    }
+    setScanLoading(false);
+  }
+
+  /** Ciclo de detección: revisa el video cada 400ms buscando un código de barras. */
+  function runScanLoop(detector) {
+    scanIntervalRef.current = setInterval(async () => {
+      if (!videoRef.current || videoRef.current.readyState < 2) return;
+      try {
+        const codes = await detector.detect(videoRef.current);
+        if (codes.length > 0) {
+          stopBarcodeScanner();
+          fetchProductByBarcode(codes[0].rawValue);
+        }
+      } catch {}
+    }, 400);
+  }
+
+  async function startBarcodeScanner() {
+    setShowScanner(true);
+    setScanError(null);
+    setScannedProduct(null);
+    if (!("BarcodeDetector" in window)) {
+      setScanError("Tu navegador no soporta el lector de códigos (funciona en Chrome/Android). Agrega el alimento manualmente.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      const detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
+      runScanLoop(detector);
+    } catch {
+      setScanError("No se pudo acceder a la cámara. Revisa los permisos del navegador.");
+    }
+  }
+
+  function confirmScannedProduct() {
+    const grams = Number(scanPortionDraft);
+    if (!scannedProduct || !grams || grams <= 0) return;
+    const category = inferCategory(scannedProduct);
+    const newFood = { id: uid(), name: scannedProduct.name, kcal: scannedProduct.kcal, p: scannedProduct.p, c: scannedProduct.c, f: scannedProduct.f, image: scannedProduct.image, category, custom: true };
+    setFoods((prev) => [newFood, ...prev]);
+    closeScanner();
+    addFoodFromPicker(newFood, grams);
+  }
+
+  // Apaga la cámara si el componente se desmonta con el escáner abierto.
+  useEffect(() => () => stopBarcodeScanner(), []);
+
   function addCustomFood() {
     const { name, portion, kcal, p, c, f, image, category } = customForm;
     if (!name.trim() || !portion || Number(portion) <= 0) { setCustomError("Ponle nombre y un tamaño de porción válido."); return; }
@@ -1797,32 +1865,37 @@ export default function NutriDash() {
       `}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 48, marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {appView !== "inicio" && (
-              <button onClick={() => setAppView("inicio")} style={{ ...backBtnStyle, width: 30, height: 30, flexShrink: 0 }}><ArrowLeft size={15} color="var(--text-dim)" /></button>
+              <button onClick={() => setAppView("inicio")} style={backBtnStyle}><ArrowLeft size={16} color="var(--text-dim)" /></button>
             )}
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <GaugeIcon size={15} color="#07060B" strokeWidth={2.5} />
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 16px rgba(139,92,246,0.4)", flexShrink: 0 }}>
+              <GaugeIcon size={20} color="#07060B" strokeWidth={2.5} />
             </div>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {appView === "inicio" && (account.name ? `Hola, ${account.name}` : "Hola 👋")}
-              {appView === "perfil" && "Datos"}
-              {appView === "nutricion" && "Nutrición"}
-              {appView === "entrenamiento" && "Entrenamiento"}
-              {appView === "progreso" && "Progreso corporal"}
+            <div>
+              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 21, letterSpacing: 0.5, lineHeight: 1 }}>
+                Test<span style={{ color: "var(--accent)" }}>App</span>
+              </div>
+              <div style={{ fontSize: 10.5, color: "var(--text-dim)", letterSpacing: 1.5, textTransform: "uppercase" }}>
+                {appView === "inicio" && "Menú principal"}
+                {appView === "perfil" && "Datos"}
+                {appView === "nutricion" && "Tablero de nutrición"}
+                {appView === "entrenamiento" && "Tablero de entrenamiento"}
+                {appView === "progreso" && "Progreso corporal"}
+              </div>
             </div>
           </div>
           {appView === "inicio" && (
-            <button onClick={() => setShowAccountModal(true)} title="Cuenta" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <User size={15} color="var(--text-dim)" />
+            <button onClick={() => setShowAccountModal(true)} title="Cuenta" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <User size={18} color="var(--text-dim)" />
             </button>
           )}
         </div>
 
         {/* -------------------- PANTALLA: INICIO -------------------- */}
         {appView === "inicio" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {(() => {
             const kcalLeft = Math.max(targetCalories - totals.kcal, 0);
             const pLeft = Math.max(targetProtein - totals.p, 0);
@@ -1843,93 +1916,110 @@ export default function NutriDash() {
             // Misión 3 — Pasos: se compara contra la fecha de hoy, se "resetea" solo cada día.
             const stepsMissionDone = stepsCompletedDates.includes(todayISO());
 
-            const missions = [
-              { key: "nutricion", icon: UtensilsCrossed, label: "Nutrición", done: nutritionMissionDone, onClick: null },
-              { key: "entreno", icon: Dumbbell, label: "Entreno", done: trainingMissionDone, onClick: todaysWorkout ? () => toggleDayCompleted(todaysWorkout.id) : null },
-              { key: "pasos", icon: Footprints, label: "Pasos", done: stepsMissionDone, onClick: toggleStepsToday },
-            ];
-
             return (
               <>
-                {/* -------- Hero Card: kcal + macros + próximo entreno + pasos, todo en uno -------- */}
-                <Panel style={{ padding: 14 }}>
-                  {overBudget && !nutritionMissionDone ? (
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
-                  ) : nutritionMissionDone ? (
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Meta de kcal cumplida <span style={{ color: "var(--success)" }}>✓</span></div>
-                  ) : (
-                    <div style={{ fontSize: 15, fontWeight: 700 }}>Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span></div>
-                  )}
-                  <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={12} /> {round(pLeft)}g</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={12} /> {round(cLeft)}g</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={12} /> {round(fLeft)}g</span>
-                    <span style={{ color: "var(--text-dim)" }}>{mealsDone}/{mealCount} comidas</span>
+                <Panel>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                      <UtensilsCrossed size={14} color="var(--accent)" /> Hoy en nutrición
+                    </div>
+                    {nutritionMissionDone && <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--success)" }}><CheckCircle2 size={14} /> Misión cumplida</span>}
                   </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
-                      <Dumbbell size={13} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />
-                      <div style={{ fontSize: 11.5, lineHeight: 1.35, minWidth: 0 }}>
-                        {nextWorkout ? (
-                          trainingMissionDone
-                            ? <span style={{ color: "var(--text)" }}>Hecho: {nextWorkout.day.name || "Día"}</span>
-                            : <span>{nextWorkout.when}: <span style={{ color: "var(--accent2)" }}>{nextWorkout.day.name || "Día"}</span></span>
-                        ) : <span style={{ color: "var(--text-dim)" }}>Sin rutina</span>}
-                      </div>
+                  {overBudget && !nutritionMissionDone ? (
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
+                  ) : (
+                    <div style={{ fontSize: 14, fontWeight: 700, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                      {nutritionMissionDone ? (
+                        <span style={{ color: "var(--text)" }}>Dentro de tu rango de {round(kcalTolerance)} kcal <span style={{ color: "var(--success)" }}>✓</span></span>
+                      ) : (
+                        <>
+                          Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> ·
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={13} /> {round(pLeft)}g</span> ·
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={13} /> {round(cLeft)}g</span> ·
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={13} /> {round(fLeft)}g</span>
+                        </>
+                      )}
                     </div>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
-                      <Footprints size={13} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />
-                      <div style={{ fontSize: 11.5, lineHeight: 1.35, color: "var(--text-dim)" }}>Meta: {steps.toLocaleString("es-MX")} pasos</div>
-                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
+                    {mealsDone === mealCount ? "Todas tus comidas completadas ✓" : `Faltan ${mealCount - mealsDone} de ${mealCount} comidas por completar`}
                   </div>
                 </Panel>
 
-                {/* -------- Fila de 3 misiones diarias -------- */}
-                <Panel style={{ padding: "12px 14px" }}>
-                  <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", gap: 6 }}>
-                    {missions.map((m) => (
-                      <button
-                        key={m.key}
-                        onClick={m.onClick ?? undefined}
-                        disabled={!m.onClick}
-                        style={{
-                          flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-                          cursor: m.onClick ? "pointer" : "default", padding: "2px 0",
-                        }}
-                      >
-                        <div style={{ width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", border: `2px solid ${m.done ? "var(--success)" : "var(--border)"}` }}>
-                          {m.done ? <CheckCircle2 size={17} color="var(--success)" /> : <m.icon size={16} color="var(--text-dim)" />}
-                        </div>
-                        <span style={{ fontSize: 9.5, fontWeight: 600, color: "var(--text-dim)" }}>{m.label}</span>
-                      </button>
-                    ))}
+                <Panel>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                    <Dumbbell size={14} color="var(--accent)" /> Entrenamiento
                   </div>
+                  {nextWorkout ? (
+                    trainingMissionDone ? (
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <CheckCircle2 size={15} color="var(--success)" /> Entrenamiento de hoy logrado — {nextWorkout.day.name || "Día"}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                        Próximo entreno: <span style={{ color: "var(--accent2)" }}>{nextWorkout.when} — {nextWorkout.day.name || "Día"}</span>
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No tienes días de entrenamiento programados.</div>
+                  )}
+                  {todaysWorkout && (
+                    <button
+                      onClick={() => toggleDayCompleted(todaysWorkout.id)}
+                      style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: trainingMissionDone ? "var(--success)" : "var(--panel2)", color: trainingMissionDone ? "#07060B" : "var(--text-dim)" }}
+                    >
+                      {trainingMissionDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                      {trainingMissionDone ? "Completado hoy" : "Marcar como completado"}
+                    </button>
+                  )}
+                </Panel>
+
+                <Panel>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                    <Footprints size={14} color="var(--accent)" /> Pasos diarios
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 10 }}>Meta configurada en Datos: {steps.toLocaleString("es-MX")} pasos</div>
+                  <button
+                    onClick={toggleStepsToday}
+                    style={{ width: "100%", padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12.5, background: stepsMissionDone ? "var(--success)" : "var(--panel2)", color: stepsMissionDone ? "#07060B" : "var(--text-dim)" }}
+                  >
+                    {stepsMissionDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+                    {stepsMissionDone ? "Meta de pasos cumplida hoy ✓" : "¿Cumpliste tu meta de pasos hoy?"}
+                  </button>
                 </Panel>
               </>
             );
           })()}
 
-          {/* -------- Semana actual, compacta -------- */}
-          <Panel style={{ padding: "12px 14px" }}>
-            <WeekStrip getDayStatus={getDayMissionStatus} />
+          <Panel>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 12, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+              <CalendarClock size={14} color="var(--accent)" /> Calendario de consistencia
+            </div>
+            <ConsistencyCalendar getDayStatus={getDayMissionStatus} />
           </Panel>
 
-          {/* -------- Acceso a Datos -------- */}
-          <button
-            onClick={() => setAppView("perfil")}
-            style={{
-              display: "flex", alignItems: "center", gap: 10, textAlign: "left",
-              padding: "10px 14px", borderRadius: 12, border: "1px solid var(--border)",
-              background: "var(--panel)", cursor: "pointer", color: "var(--text)",
-            }}
-          >
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <User size={15} color="#07060B" />
-            </div>
-            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Datos y objetivo</div>
-            <ChevronRight size={16} color="var(--text-dim)" />
-          </button>
+          {[
+            { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
+          ].map(({ key, title, sub, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setAppView(key)}
+              style={{
+                display: "flex", alignItems: "center", gap: 14, textAlign: "left",
+                padding: "20px 18px", borderRadius: 16, border: "1px solid var(--border)",
+                background: "var(--panel)", cursor: "pointer", color: "var(--text)",
+              }}
+            >
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 16px rgba(139,92,246,0.3)" }}>
+                <Icon size={24} color="#07060B" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 18 }}>{title}</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>{sub}</div>
+              </div>
+              <ChevronRight size={20} color="var(--text-dim)" />
+            </button>
+          ))}
         </div>
         )}
 
@@ -2735,9 +2825,14 @@ export default function NutriDash() {
             </div>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 10 }}>
-            <Search size={15} color="var(--text-dim)" />
-            <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", flex: 1 }}>
+              <Search size={15} color="var(--text-dim)" />
+              <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+            </div>
+            <button onClick={startBarcodeScanner} title="Escanear código de barras" style={{ width: 38, height: 38, borderRadius: 9, border: "1px solid var(--accent2)55", background: "var(--accent2)1A", color: "var(--accent2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <ScanLine size={17} />
+            </button>
           </div>
 
           <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
@@ -2864,6 +2959,52 @@ export default function NutriDash() {
             </button>
             <input ref={importInputRef} type="file" accept="application/json" onChange={handleImportFile} style={{ display: "none" }} />
           </div>
+        </ModalShell>
+      )}
+
+      {/* -------------------- MODAL: ESCANEAR CÓDIGO DE BARRAS -------------------- */}
+      {showScanner && (
+        <ModalShell title="Escanear código de barras" onClose={closeScanner}>
+          {scanError && (
+            <div style={{ fontSize: 12.5, color: "var(--danger)", background: "var(--panel2)", border: "1px solid var(--border)", borderRadius: 9, padding: "10px 12px", marginBottom: 12, lineHeight: 1.5 }}>
+              {scanError}
+            </div>
+          )}
+
+          {!scannedProduct && !scanError && (
+            <>
+              <div style={{ position: "relative", width: "100%", aspectRatio: "1", borderRadius: 12, overflow: "hidden", background: "#000", marginBottom: 10 }}>
+                <video ref={videoRef} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ position: "absolute", inset: "20% 8%", border: "2px solid var(--accent)", borderRadius: 10, boxShadow: "0 0 0 999px rgba(0,0,0,0.35)" }} />
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--text-dim)", textAlign: "center" }}>
+                {scanLoading ? "Buscando producto..." : "Apunta la cámara al código de barras del producto"}
+              </div>
+            </>
+          )}
+
+          {scannedProduct && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                {scannedProduct.image ? (
+                  <img src={scannedProduct.image} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", border: "1px solid var(--border)" }} />
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 10, background: "var(--panel2)", border: "1px solid var(--border)" }} />
+                )}
+                <div style={{ fontSize: 14, fontWeight: 700, minWidth: 0 }}>{scannedProduct.name}</div>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, marginBottom: 14, color: "var(--text-dim)" }}>
+                <span style={{ color: "var(--text)" }}>{round(scannedProduct.kcal)} kcal /100g</span>
+                <span style={{ color: "var(--protein)" }}>P {round(scannedProduct.p)}g</span>
+                <span style={{ color: "var(--carbs)" }}>C {round(scannedProduct.c)}g</span>
+                <span style={{ color: "var(--fat)" }}>G {round(scannedProduct.f)}g</span>
+              </div>
+              <Field label="Gramos">
+                <input type="number" style={inputStyle} value={scanPortionDraft} onChange={(e) => setScanPortionDraft(e.target.value)} />
+              </Field>
+              <button onClick={confirmScannedProduct} style={primaryButtonStyle}><Plus size={16} /> Agregar</button>
+            </div>
+          )}
         </ModalShell>
       )}
 
