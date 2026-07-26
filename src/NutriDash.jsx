@@ -925,7 +925,7 @@ function BottomBar({ active, onNavigate }) {
 
 
 const CAL_LEVEL_STYLE = {
-  excelente: { background: "var(--accent2)", color: "#07060B" },
+  excelente: { background: "var(--success)", color: "#07060B" },
   parcial: { background: "var(--fat)", color: "#07060B" },
   ninguna: { background: "var(--danger)33", color: "var(--danger)" },
 };
@@ -973,7 +973,7 @@ function ConsistencyCalendar({ getDayStatus }) {
         })}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 10, fontSize: 10, color: "var(--text-dim)", flexWrap: "wrap" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--accent2)", display: "inline-block" }} />Excelente (3/3)</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--success)", display: "inline-block" }} />Excelente (3/3)</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--fat)", display: "inline-block" }} />Parcial (1-2)</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--danger)33", border: "1px solid var(--danger)", display: "inline-block" }} />Ninguna</span>
       </div>
@@ -1745,7 +1745,7 @@ export default function NutriDash() {
   return (
     <div style={{
       "--bg": "#07060B", "--panel": "#120F1B", "--panel2": "#1A1524", "--border": "#2B2438",
-      "--accent": "#8B5CF6", "--accent2": "#C084FC", "--protein": "#E85D75", "--carbs": "#5CACFF",
+      "--accent": "#8B5CF6", "--accent2": "#C084FC", "--success": "#34D399", "--protein": "#E85D75", "--carbs": "#5CACFF",
       "--fat": "#FFC857", "--text": "#F3F1EA", "--text-dim": "#8A93A6", "--danger": "#FF5C5C",
       background: "var(--bg)", minHeight: "100vh", fontFamily: "'Inter', sans-serif",
       color: "var(--text)", padding: "18px 14px 92px", boxSizing: "border-box",
@@ -1811,19 +1811,19 @@ export default function NutriDash() {
 
             return (
               <>
-                <Panel style={nutritionMissionDone ? { border: "1px solid var(--accent2)66" } : undefined}>
+                <Panel style={nutritionMissionDone ? { border: "1px solid var(--success)66" } : undefined}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
                       <UtensilsCrossed size={14} color="var(--accent)" /> Hoy en nutrición
                     </div>
-                    {nutritionMissionDone && <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--accent2)" }}><CheckCircle2 size={14} /> Misión cumplida</span>}
+                    {nutritionMissionDone && <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--success)" }}><CheckCircle2 size={14} /> Misión cumplida</span>}
                   </div>
                   {overBudget && !nutritionMissionDone ? (
                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
                   ) : (
                     <div style={{ fontSize: 14, fontWeight: 700, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                       {nutritionMissionDone ? (
-                        <span style={{ color: "var(--accent2)" }}>Dentro de tu rango de {round(kcalTolerance)} kcal ✓</span>
+                        <span style={{ color: "var(--success)" }}>Dentro de tu rango de {round(kcalTolerance)} kcal ✓</span>
                       ) : (
                         <>
                           Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> ·
@@ -1839,13 +1839,13 @@ export default function NutriDash() {
                   </div>
                 </Panel>
 
-                <Panel style={trainingMissionDone ? { border: "1px solid var(--accent2)66" } : undefined}>
+                <Panel style={trainingMissionDone ? { border: "1px solid var(--success)66" } : undefined}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
                     <Dumbbell size={14} color="var(--accent)" /> Entrenamiento
                   </div>
                   {nextWorkout ? (
                     trainingMissionDone ? (
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--accent2)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--success)", display: "flex", alignItems: "center", gap: 6 }}>
                         <CheckCircle2 size={15} /> ¡Entrenamiento de hoy logrado! — {nextWorkout.day.name || "Día"}
                       </div>
                     ) : (
@@ -1859,7 +1859,7 @@ export default function NutriDash() {
                   {todaysWorkout && (
                     <button
                       onClick={() => toggleDayCompleted(todaysWorkout.id)}
-                      style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: trainingMissionDone ? "var(--accent2)" : "var(--panel2)", color: trainingMissionDone ? "#07060B" : "var(--text-dim)" }}
+                      style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: trainingMissionDone ? "var(--success)" : "var(--panel2)", color: trainingMissionDone ? "#07060B" : "var(--text-dim)" }}
                     >
                       {trainingMissionDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
                       {trainingMissionDone ? "Completado hoy" : "Marcar como completado"}
@@ -1867,14 +1867,14 @@ export default function NutriDash() {
                   )}
                 </Panel>
 
-                <Panel style={stepsMissionDone ? { border: "1px solid var(--accent2)66" } : undefined}>
+                <Panel style={stepsMissionDone ? { border: "1px solid var(--success)66" } : undefined}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
                     <Footprints size={14} color="var(--accent)" /> Pasos diarios
                   </div>
                   <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 10 }}>Meta configurada en Datos: {steps.toLocaleString("es-MX")} pasos</div>
                   <button
                     onClick={toggleStepsToday}
-                    style={{ width: "100%", padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12.5, background: stepsMissionDone ? "var(--accent2)" : "var(--panel2)", color: stepsMissionDone ? "#07060B" : "var(--text-dim)" }}
+                    style={{ width: "100%", padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12.5, background: stepsMissionDone ? "var(--success)" : "var(--panel2)", color: stepsMissionDone ? "#07060B" : "var(--text-dim)" }}
                   >
                     {stepsMissionDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
                     {stepsMissionDone ? "Meta de pasos cumplida hoy ✓" : "¿Cumpliste tu meta de pasos hoy?"}
@@ -1931,10 +1931,10 @@ export default function NutriDash() {
             const mealTotal = meal.items.reduce((s, i) => s + i.kcal, 0);
             const mealMacros = meal.items.reduce((a, i) => ({ p: a.p + i.p, c: a.c + i.c, f: a.f + i.f }), { p: 0, c: 0, f: 0 });
             return (
-              <Panel key={meal.id} style={meal.completed ? { border: "1px solid var(--accent2)66", background: "linear-gradient(180deg, rgba(196,181,253,0.06), transparent)" } : undefined}>
+              <Panel key={meal.id} style={meal.completed ? { border: "1px solid var(--success)66", background: "linear-gradient(180deg, rgba(52,211,153,0.06), transparent)" } : undefined}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
                   <button onClick={() => toggleMealCompleted(meal.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", flexShrink: 0 }} title="Marcar comida como completada">
-                    {meal.completed ? <CheckCircle2 size={20} color="var(--accent2)" /> : <Circle size={20} color="var(--text-dim)" />}
+                    {meal.completed ? <CheckCircle2 size={20} color="var(--success)" /> : <Circle size={20} color="var(--text-dim)" />}
                   </button>
                   <input
                     value={meal.name}
@@ -2023,7 +2023,7 @@ export default function NutriDash() {
                           </div>
                           {day.meals.filter((m) => m.items.length > 0).map((m) => (
                             <div key={m.id} style={{ marginBottom: 8 }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: m.completed ? "var(--accent2)" : "var(--text)", marginBottom: 3 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: m.completed ? "var(--success)" : "var(--text)", marginBottom: 3 }}>
                                 {m.completed && "✓ "}{m.name}
                               </div>
                               {m.items.map((it) => (
@@ -2249,7 +2249,7 @@ export default function NutriDash() {
                                     {day.isRestDay ? (
                                       <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--accent2)", fontWeight: 700 }}><Moon size={13} /> Descanso</span>
                                     ) : day.completed ? (
-                                      <CheckCircle2 size={15} color="var(--accent2)" />
+                                      <CheckCircle2 size={15} color="var(--success)" />
                                     ) : (
                                       <span>{dayExList.length} ej.</span>
                                     )}
@@ -2329,7 +2329,7 @@ export default function NutriDash() {
                     <button onClick={() => askConfirm(`¿Eliminar el día "${day.name || "Día"}" y sus ejercicios?`, () => removeDay(day.id))} style={{ ...iconBtnStyle, flexShrink: 0, color: "var(--danger)" }}><Trash2 size={14} /></button>
                   </div>
                   {day.isRestDay ? (
-                    <div style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, background: "var(--accent2)1A", border: "1px solid var(--accent2)55", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13, color: "var(--accent2)" }}>
+                    <div style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, background: "var(--success)1A", border: "1px solid var(--success)55", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13, color: "var(--success)" }}>
                       <Moon size={16} /> Día de descanso — cuenta automático para tu misión de entrenamiento
                     </div>
                   ) : (
@@ -2338,7 +2338,7 @@ export default function NutriDash() {
                       style={{
                         marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, border: "none", cursor: "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13,
-                        background: day.completed ? "var(--accent2)" : "var(--panel2)", color: day.completed ? "#07060B" : "var(--text-dim)",
+                        background: day.completed ? "var(--success)" : "var(--panel2)", color: day.completed ? "#07060B" : "var(--text-dim)",
                       }}
                     >
                       {day.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
@@ -3120,12 +3120,12 @@ export default function NutriDash() {
       {toastMsg && (
         <div style={{
           position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)", zIndex: 100,
-          background: "var(--panel)", border: "1px solid var(--accent2)", color: "var(--text)",
+          background: "var(--panel)", border: "1px solid var(--success)", color: "var(--text)",
           padding: "10px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600,
           boxShadow: "0 8px 24px rgba(0,0,0,0.5)", display: "flex", alignItems: "center", gap: 8,
           maxWidth: "90vw", textAlign: "center",
         }}>
-          <CheckCircle2 size={16} color="var(--accent2)" style={{ flexShrink: 0 }} /> {toastMsg}
+          <CheckCircle2 size={16} color="var(--success)" style={{ flexShrink: 0 }} /> {toastMsg}
         </div>
       )}
 
