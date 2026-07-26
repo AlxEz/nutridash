@@ -929,6 +929,45 @@ const CAL_LEVEL_STYLE = {
   parcial: { background: "var(--fat)", color: "#07060B" },
   ninguna: { background: "var(--danger)33", color: "var(--danger)" },
 };
+/** Tira compacta de la semana actual (7 días, sin navegación) — usada en el Home. */
+const DOW_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
+function WeekStrip({ getDayStatus }) {
+  const today = new Date();
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - mondayOffset);
+  const todayStr = todayISO();
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+      {Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const status = dateStr <= todayStr ? getDayStatus(dateStr) : null;
+        const style = status ? CAL_LEVEL_STYLE[status.level] : { background: "var(--panel2)", color: "var(--text-dim)" };
+        const isToday = dateStr === todayStr;
+        return (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+            <span style={{ fontSize: 8.5, color: "var(--text-dim)" }}>{DOW_LETTERS[i]}</span>
+            <div
+              title={status ? `${status.met}/3 misiones` : "Sin datos"}
+              style={{
+                width: "100%", aspectRatio: "1", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+                border: isToday ? "1.5px solid var(--accent)" : "1px solid var(--border)",
+                ...style,
+              }}
+            >
+              {d.getDate()}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ConsistencyCalendar({ getDayStatus }) {
   const [viewDate, setViewDate] = useState(() => new Date());
   const year = viewDate.getFullYear();
@@ -1758,37 +1797,32 @@ export default function NutriDash() {
       `}</style>
 
       <div style={{ maxWidth: 460, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 48, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             {appView !== "inicio" && (
-              <button onClick={() => setAppView("inicio")} style={backBtnStyle}><ArrowLeft size={16} color="var(--text-dim)" /></button>
+              <button onClick={() => setAppView("inicio")} style={{ ...backBtnStyle, width: 30, height: 30, flexShrink: 0 }}><ArrowLeft size={15} color="var(--text-dim)" /></button>
             )}
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 16px rgba(139,92,246,0.4)", flexShrink: 0 }}>
-              <GaugeIcon size={20} color="#07060B" strokeWidth={2.5} />
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <GaugeIcon size={15} color="#07060B" strokeWidth={2.5} />
             </div>
-            <div>
-              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 21, letterSpacing: 0.5, lineHeight: 1 }}>
-                Test<span style={{ color: "var(--accent)" }}>App</span>
-              </div>
-              <div style={{ fontSize: 10.5, color: "var(--text-dim)", letterSpacing: 1.5, textTransform: "uppercase" }}>
-                {appView === "inicio" && "Menú principal"}
-                {appView === "perfil" && "Datos"}
-                {appView === "nutricion" && "Tablero de nutrición"}
-                {appView === "entrenamiento" && "Tablero de entrenamiento"}
-                {appView === "progreso" && "Progreso corporal"}
-              </div>
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {appView === "inicio" && (account.name ? `Hola, ${account.name}` : "Hola 👋")}
+              {appView === "perfil" && "Datos"}
+              {appView === "nutricion" && "Nutrición"}
+              {appView === "entrenamiento" && "Entrenamiento"}
+              {appView === "progreso" && "Progreso corporal"}
             </div>
           </div>
           {appView === "inicio" && (
-            <button onClick={() => setShowAccountModal(true)} title="Cuenta" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <User size={18} color="var(--text-dim)" />
+            <button onClick={() => setShowAccountModal(true)} title="Cuenta" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <User size={15} color="var(--text-dim)" />
             </button>
           )}
         </div>
 
         {/* -------------------- PANTALLA: INICIO -------------------- */}
         {appView === "inicio" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {(() => {
             const kcalLeft = Math.max(targetCalories - totals.kcal, 0);
             const pLeft = Math.max(targetProtein - totals.p, 0);
@@ -1809,110 +1843,93 @@ export default function NutriDash() {
             // Misión 3 — Pasos: se compara contra la fecha de hoy, se "resetea" solo cada día.
             const stepsMissionDone = stepsCompletedDates.includes(todayISO());
 
+            const missions = [
+              { key: "nutricion", icon: UtensilsCrossed, label: "Nutrición", done: nutritionMissionDone, onClick: null },
+              { key: "entreno", icon: Dumbbell, label: "Entreno", done: trainingMissionDone, onClick: todaysWorkout ? () => toggleDayCompleted(todaysWorkout.id) : null },
+              { key: "pasos", icon: Footprints, label: "Pasos", done: stepsMissionDone, onClick: toggleStepsToday },
+            ];
+
             return (
               <>
-                <Panel style={nutritionMissionDone ? { border: "1px solid var(--success)66" } : undefined}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-                      <UtensilsCrossed size={14} color="var(--accent)" /> Hoy en nutrición
-                    </div>
-                    {nutritionMissionDone && <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "var(--success)" }}><CheckCircle2 size={14} /> Misión cumplida</span>}
-                  </div>
+                {/* -------- Hero Card: kcal + macros + próximo entreno + pasos, todo en uno -------- */}
+                <Panel style={{ padding: 14 }}>
                   {overBudget && !nutritionMissionDone ? (
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--danger)" }}>Te pasaste por {round(totals.kcal - targetCalories)} kcal</div>
+                  ) : nutritionMissionDone ? (
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Meta de kcal cumplida <span style={{ color: "var(--success)" }}>✓</span></div>
                   ) : (
-                    <div style={{ fontSize: 14, fontWeight: 700, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-                      {nutritionMissionDone ? (
-                        <span style={{ color: "var(--success)" }}>Dentro de tu rango de {round(kcalTolerance)} kcal ✓</span>
-                      ) : (
-                        <>
-                          Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span> ·
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={13} /> {round(pLeft)}g</span> ·
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={13} /> {round(cLeft)}g</span> ·
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={13} /> {round(fLeft)}g</span>
-                        </>
-                      )}
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>Te faltan <span style={{ color: "var(--accent)" }}>{round(kcalLeft)} kcal</span></div>
+                  )}
+                  <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--protein)" }}><CategoryIcon category="proteina" size={12} /> {round(pLeft)}g</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--carbs)" }}><CategoryIcon category="carbohidrato" size={12} /> {round(cLeft)}g</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--fat)" }}><CategoryIcon category="grasa" size={12} /> {round(fLeft)}g</span>
+                    <span style={{ color: "var(--text-dim)" }}>{mealsDone}/{mealCount} comidas</span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
+                      <Dumbbell size={13} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />
+                      <div style={{ fontSize: 11.5, lineHeight: 1.35, minWidth: 0 }}>
+                        {nextWorkout ? (
+                          trainingMissionDone
+                            ? <span style={{ color: "var(--text)" }}>Hecho: {nextWorkout.day.name || "Día"}</span>
+                            : <span>{nextWorkout.when}: <span style={{ color: "var(--accent2)" }}>{nextWorkout.day.name || "Día"}</span></span>
+                        ) : <span style={{ color: "var(--text-dim)" }}>Sin rutina</span>}
+                      </div>
                     </div>
-                  )}
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
-                    {mealsDone === mealCount ? "Todas tus comidas completadas ✓" : `Faltan ${mealCount - mealsDone} de ${mealCount} comidas por completar`}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
+                      <Footprints size={13} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />
+                      <div style={{ fontSize: 11.5, lineHeight: 1.35, color: "var(--text-dim)" }}>Meta: {steps.toLocaleString("es-MX")} pasos</div>
+                    </div>
                   </div>
                 </Panel>
 
-                <Panel style={trainingMissionDone ? { border: "1px solid var(--success)66" } : undefined}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-                    <Dumbbell size={14} color="var(--accent)" /> Entrenamiento
+                {/* -------- Fila de 3 misiones diarias -------- */}
+                <Panel style={{ padding: "12px 14px" }}>
+                  <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", gap: 6 }}>
+                    {missions.map((m) => (
+                      <button
+                        key={m.key}
+                        onClick={m.onClick ?? undefined}
+                        disabled={!m.onClick}
+                        style={{
+                          flex: 1, background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                          cursor: m.onClick ? "pointer" : "default", padding: "2px 0",
+                        }}
+                      >
+                        <div style={{ width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--panel2)", border: `2px solid ${m.done ? "var(--success)" : "var(--border)"}` }}>
+                          {m.done ? <CheckCircle2 size={17} color="var(--success)" /> : <m.icon size={16} color="var(--text-dim)" />}
+                        </div>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: "var(--text-dim)" }}>{m.label}</span>
+                      </button>
+                    ))}
                   </div>
-                  {nextWorkout ? (
-                    trainingMissionDone ? (
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--success)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <CheckCircle2 size={15} /> ¡Entrenamiento de hoy logrado! — {nextWorkout.day.name || "Día"}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>
-                        Próximo entreno: <span style={{ color: "var(--accent2)" }}>{nextWorkout.when} — {nextWorkout.day.name || "Día"}</span>
-                      </div>
-                    )
-                  ) : (
-                    <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No tienes días de entrenamiento programados.</div>
-                  )}
-                  {todaysWorkout && (
-                    <button
-                      onClick={() => toggleDayCompleted(todaysWorkout.id)}
-                      style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: trainingMissionDone ? "var(--success)" : "var(--panel2)", color: trainingMissionDone ? "#07060B" : "var(--text-dim)" }}
-                    >
-                      {trainingMissionDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                      {trainingMissionDone ? "Completado hoy" : "Marcar como completado"}
-                    </button>
-                  )}
-                </Panel>
-
-                <Panel style={stepsMissionDone ? { border: "1px solid var(--success)66" } : undefined}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-                    <Footprints size={14} color="var(--accent)" /> Pasos diarios
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginBottom: 10 }}>Meta configurada en Datos: {steps.toLocaleString("es-MX")} pasos</div>
-                  <button
-                    onClick={toggleStepsToday}
-                    style={{ width: "100%", padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12.5, background: stepsMissionDone ? "var(--success)" : "var(--panel2)", color: stepsMissionDone ? "#07060B" : "var(--text-dim)" }}
-                  >
-                    {stepsMissionDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
-                    {stepsMissionDone ? "Meta de pasos cumplida hoy ✓" : "¿Cumpliste tu meta de pasos hoy?"}
-                  </button>
                 </Panel>
               </>
             );
           })()}
 
-          <Panel>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 12, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-              <CalendarClock size={14} color="var(--accent)" /> Calendario de consistencia
-            </div>
-            <ConsistencyCalendar getDayStatus={getDayMissionStatus} />
+          {/* -------- Semana actual, compacta -------- */}
+          <Panel style={{ padding: "12px 14px" }}>
+            <WeekStrip getDayStatus={getDayMissionStatus} />
           </Panel>
 
-          {[
-            { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
-          ].map(({ key, title, sub, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setAppView(key)}
-              style={{
-                display: "flex", alignItems: "center", gap: 14, textAlign: "left",
-                padding: "20px 18px", borderRadius: 16, border: "1px solid var(--border)",
-                background: "var(--panel)", cursor: "pointer", color: "var(--text)",
-              }}
-            >
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 16px rgba(139,92,246,0.3)" }}>
-                <Icon size={24} color="#07060B" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 18 }}>{title}</div>
-                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>{sub}</div>
-              </div>
-              <ChevronRight size={20} color="var(--text-dim)" />
-            </button>
-          ))}
+          {/* -------- Acceso a Datos -------- */}
+          <button
+            onClick={() => setAppView("perfil")}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, textAlign: "left",
+              padding: "10px 14px", borderRadius: 12, border: "1px solid var(--border)",
+              background: "var(--panel)", cursor: "pointer", color: "var(--text)",
+            }}
+          >
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <User size={15} color="#07060B" />
+            </div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Datos y objetivo</div>
+            <ChevronRight size={16} color="var(--text-dim)" />
+          </button>
         </div>
         )}
 
@@ -1931,7 +1948,7 @@ export default function NutriDash() {
             const mealTotal = meal.items.reduce((s, i) => s + i.kcal, 0);
             const mealMacros = meal.items.reduce((a, i) => ({ p: a.p + i.p, c: a.c + i.c, f: a.f + i.f }), { p: 0, c: 0, f: 0 });
             return (
-              <Panel key={meal.id} style={meal.completed ? { border: "1px solid var(--success)66", background: "linear-gradient(180deg, rgba(52,211,153,0.06), transparent)" } : undefined}>
+              <Panel key={meal.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
                   <button onClick={() => toggleMealCompleted(meal.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", flexShrink: 0 }} title="Marcar comida como completada">
                     {meal.completed ? <CheckCircle2 size={20} color="var(--success)" /> : <Circle size={20} color="var(--text-dim)" />}
@@ -2023,7 +2040,7 @@ export default function NutriDash() {
                           </div>
                           {day.meals.filter((m) => m.items.length > 0).map((m) => (
                             <div key={m.id} style={{ marginBottom: 8 }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: m.completed ? "var(--success)" : "var(--text)", marginBottom: 3 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginBottom: 3 }}>
                                 {m.completed && "✓ "}{m.name}
                               </div>
                               {m.items.map((it) => (
@@ -2329,8 +2346,8 @@ export default function NutriDash() {
                     <button onClick={() => askConfirm(`¿Eliminar el día "${day.name || "Día"}" y sus ejercicios?`, () => removeDay(day.id))} style={{ ...iconBtnStyle, flexShrink: 0, color: "var(--danger)" }}><Trash2 size={14} /></button>
                   </div>
                   {day.isRestDay ? (
-                    <div style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, background: "var(--success)1A", border: "1px solid var(--success)55", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13, color: "var(--success)" }}>
-                      <Moon size={16} /> Día de descanso — cuenta automático para tu misión de entrenamiento
+                    <div style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 9, background: "var(--panel2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontWeight: 700, fontSize: 13, color: "var(--text-dim)" }}>
+                      <Moon size={16} color="var(--accent2)" /> Día de descanso <CheckCircle2 size={14} color="var(--success)" /> cuenta automático para tu misión de entrenamiento
                     </div>
                   ) : (
                     <button
