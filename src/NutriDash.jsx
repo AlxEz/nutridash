@@ -1896,6 +1896,29 @@ export default function NutriDash() {
         {/* -------------------- PANTALLA: INICIO -------------------- */}
         {appView === "inicio" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
+          ].map(({ key, title, sub, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setAppView(key)}
+              style={{
+                display: "flex", alignItems: "center", gap: 14, textAlign: "left",
+                padding: "20px 18px", borderRadius: 16, border: "1px solid var(--border)",
+                background: "var(--panel)", cursor: "pointer", color: "var(--text)",
+              }}
+            >
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 16px rgba(139,92,246,0.3)" }}>
+                <Icon size={24} color="#07060B" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 18 }}>{title}</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>{sub}</div>
+              </div>
+              <ChevronRight size={20} color="var(--text-dim)" />
+            </button>
+          ))}
+
           {(() => {
             const kcalLeft = Math.max(targetCalories - totals.kcal, 0);
             const pLeft = Math.max(targetProtein - totals.p, 0);
@@ -1997,29 +2020,6 @@ export default function NutriDash() {
             </div>
             <ConsistencyCalendar getDayStatus={getDayMissionStatus} />
           </Panel>
-
-          {[
-            { key: "perfil", title: "Datos", sub: "Tus datos y objetivo", icon: User },
-          ].map(({ key, title, sub, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setAppView(key)}
-              style={{
-                display: "flex", alignItems: "center", gap: 14, textAlign: "left",
-                padding: "20px 18px", borderRadius: 16, border: "1px solid var(--border)",
-                background: "var(--panel)", cursor: "pointer", color: "var(--text)",
-              }}
-            >
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg, var(--accent), #5B21B6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 16px rgba(139,92,246,0.3)" }}>
-                <Icon size={24} color="#07060B" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 18 }}>{title}</div>
-                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>{sub}</div>
-              </div>
-              <ChevronRight size={20} color="var(--text-dim)" />
-            </button>
-          ))}
         </div>
         )}
 
