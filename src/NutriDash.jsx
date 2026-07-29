@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -201,6 +201,11 @@ function daysSince(dateStr) {
 }
 function dateDiffDays(fromDate, toDate) {
   return Math.round((new Date(`${toDate}T00:00:00`) - new Date(`${fromDate}T00:00:00`)) / 86400000);
+}
+/** Ventana de edición retroactiva de misiones: solo hoy y ayer (1 día de gracia). */
+function isEditableDate(dateStr) {
+  const today = todayISO();
+  return dateStr === today || dateStr === addDaysToDate(today, -1);
 }
 
 /* ---- Frecuencia de control elegida por el usuario para "próxima medición" ---- */
@@ -930,7 +935,7 @@ const CAL_LEVEL_STYLE = {
   ninguna: { background: "var(--danger)33", color: "var(--danger)" },
 };
 
-function ConsistencyCalendar({ getDayStatus }) {
+function ConsistencyCalendar({ getDayStatus, onSelectDate }) {
   const [viewDate, setViewDate] = useState(() => new Date());
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -957,14 +962,17 @@ function ConsistencyCalendar({ getDayStatus }) {
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
           const status = dateStr <= todayStr ? getDayStatus(dateStr) : null;
           const style = status ? CAL_LEVEL_STYLE[status.level] : { background: "var(--panel2)", color: "var(--text-dim)" };
+          const editable = isEditableDate(dateStr);
           return (
             <div
               key={i}
-              title={status ? `${status.met}/3 misiones` : "Sin datos"}
+              onClick={editable ? () => onSelectDate(dateStr) : undefined}
+              title={editable ? "Toca para editar tus misiones" : status ? `${status.met}/3 misiones` : "Sin datos"}
               style={{
                 aspectRatio: "1", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
-                border: dateStr === todayStr ? "1.5px solid var(--accent)" : "1px solid var(--border)",
+                border: dateStr === todayStr ? "1.5px solid var(--accent)" : editable ? "1px dashed var(--accent2)" : "1px solid var(--border)",
+                cursor: editable ? "pointer" : "default",
                 ...style,
               }}
             >
@@ -1022,8 +1030,10 @@ export default function NutriDash() {
   const [templateNameDraft, setTemplateNameDraft] = useState("");
   const [templatePickerMealId, setTemplatePickerMealId] = useState(null);
   const [mealCount, setMealCount] = useState(stored.mealCount ?? 3);
-  const [meals, setMeals] = useState(stored.meals ?? (() => Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: `Comida ${i + 1}`, items: [], completed: false }))));
+  const [meals, setMeals] = useState(stored.meals ?? (() => Array.from({ length: 3 }, (_, i) => ({ id: uid(), name: `Comida ${i + 1}`, items: [], completed: false, reminderTime: "" }))));
   const [nutritionDate, setNutritionDate] = useState(stored.nutritionDate ?? todayISO());
+  const [notifPermission, setNotifPermission] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+  const notifiedTodayRef = useRef(new Set());
   const [nutritionHistory, setNutritionHistory] = useState(stored.nutritionHistory ?? []); // {date, meals, totals}
   const [historyOpenDate, setHistoryOpenDate] = useState(null);
 
@@ -1031,7 +1041,7 @@ export default function NutriDash() {
     setMeals((prev) => {
       if (mealCount === prev.length) return prev;
       if (mealCount > prev.length) {
-        const extra = Array.from({ length: mealCount - prev.length }, (_, i) => ({ id: uid(), name: `Comida ${prev.length + i + 1}`, items: [], completed: false }));
+        const extra = Array.from({ length: mealCount - prev.length }, (_, i) => ({ id: uid(), name: `Comida ${prev.length + i + 1}`, items: [], completed: false, reminderTime: "" }));
         return [...prev, ...extra];
       }
       return prev.slice(0, mealCount);
@@ -1040,6 +1050,30 @@ export default function NutriDash() {
 
   function toggleMealCompleted(mealId) {
     setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, completed: !m.completed } : m)));
+  }
+  function updateMealReminder(mealId, time) {
+    setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, reminderTime: time } : m)));
+  }
+
+  function requestNotificationPermission() {
+    if (typeof Notification === "undefined") { toast("Tu navegador no soporta notificaciones."); return; }
+    Notification.requestPermission().then((perm) => {
+      setNotifPermission(perm);
+      toast(perm === "granted" ? "Notificaciones activadas" : "Permiso de notificaciones no concedido");
+    });
+  }
+
+  /** Marca/desmarca el check de una comida ya archivada en el historial (solo hoy/ayer). Recalcula los totales de ese día. */
+  function toggleHistoryMealCompleted(date, mealId) {
+    if (!isEditableDate(date)) return;
+    setNutritionHistory((prev) => prev.map((day) => {
+      if (day.date !== date) return day;
+      const newMeals = day.meals.map((m) => (m.id === mealId ? { ...m, completed: !m.completed } : m));
+      const newTotals = { kcal: 0, p: 0, c: 0, f: 0 };
+      newMeals.filter((m) => m.completed).forEach((m) => m.items.forEach((it) => { newTotals.kcal += it.kcal; newTotals.p += it.p; newTotals.c += it.c; newTotals.f += it.f; }));
+      return { ...day, meals: newMeals, totals: newTotals };
+    }));
+    toast("Misión de ayer actualizada correctamente");
   }
 
   /** Suma los alimentos de un día del historial a las comidas de HOY (por posición de comida) y regresa a Nutrición. */
@@ -1060,9 +1094,14 @@ export default function NutriDash() {
   }
 
   /** Misión 3: marca/desmarca el cumplimiento de pasos de HOY, acumulando historial para el calendario. */
+  /** Misión 3: marca/desmarca pasos de una fecha (hoy o ayer). Días más viejos quedan bloqueados. */
+  function toggleStepsForDate(dateStr) {
+    if (!isEditableDate(dateStr)) return;
+    setStepsCompletedDates((prev) => (prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr]));
+    if (dateStr !== todayISO()) toast("Misión de ayer actualizada correctamente");
+  }
   function toggleStepsToday() {
-    const today = todayISO();
-    setStepsCompletedDates((prev) => (prev.includes(today) ? prev.filter((d) => d !== today) : [...prev, today]));
+    toggleStepsForDate(todayISO());
   }
 
   const [pickerMeal, setPickerMeal] = useState(null);
@@ -1090,6 +1129,7 @@ export default function NutriDash() {
   const [appView, setAppView] = useState("inicio"); // 'inicio' | 'perfil' | 'nutricion' | 'entrenamiento'
   const [confirmState, setConfirmState] = useState(null); // {message, onConfirm}
   const [toastMsg, setToastMsg] = useState(null);
+  const [editMissionsDate, setEditMissionsDate] = useState(null);
   const toastTimerRef = useRef(null);
   function toast(msg) {
     clearTimeout(toastTimerRef.current);
@@ -1097,6 +1137,7 @@ export default function NutriDash() {
     toastTimerRef.current = setTimeout(() => setToastMsg(null), 2000);
   }
   const [stepsCompletedDates, setStepsCompletedDates] = useState(stored.stepsCompletedDates ?? (stored.stepsCompletedDate ? [stored.stepsCompletedDate] : [])); // Misión 3: fechas en que se marcó cumplida la meta de pasos
+  const [restDayDates, setRestDayDates] = useState(stored.restDayDates ?? []); // fechas marcadas como descanso desde el acceso rápido (sin crear un día en un bloque)
   const askConfirm = (message, onConfirm) => setConfirmState({ message, onConfirm });
   const [account, setAccount] = useState(stored.account ?? { name: "", email: "", password: "" });
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -1204,6 +1245,29 @@ export default function NutriDash() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [nutritionDate, meals, totals]);
+
+  /** Recordatorios de comida: si la hora local coincide con la programada y la comida no está marcada, dispara una notificación nativa. */
+  useEffect(() => {
+    notifiedTodayRef.current = new Set(); // se reinicia cada vez que cambia el día de nutrición
+  }, [nutritionDate]);
+
+  useEffect(() => {
+    function checkMealReminders() {
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      meals.forEach((meal) => {
+        if (!meal.reminderTime || meal.completed) return;
+        if (meal.reminderTime === hhmm && !notifiedTodayRef.current.has(meal.id)) {
+          notifiedTodayRef.current.add(meal.id);
+          new Notification(`🔔 Hora de tu ${meal.name}`, { body: "Recuerda registrar y marcar tu comida para cumplir tu meta de hoy." });
+        }
+      });
+    }
+    checkMealReminders();
+    const interval = setInterval(checkMealReminders, 30000);
+    return () => clearInterval(interval);
+  }, [meals]);
 
   function removeFromMeal(mealId, itemId) {
     setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, items: m.items.filter((i) => i.id !== itemId) } : m)));
@@ -1584,7 +1648,7 @@ export default function NutriDash() {
     const nutritionMet = Math.abs(nutriTotals.kcal - targetCalories) <= tol;
 
     const scheduledDay = days.find((d) => d.date === dateStr);
-    const trainingMet = !scheduledDay || scheduledDay.isRestDay || !!scheduledDay.completed;
+    const trainingMet = restDayDates.includes(dateStr) || !scheduledDay || scheduledDay.isRestDay || !!scheduledDay.completed;
 
     const stepsMet = stepsCompletedDates.includes(dateStr);
 
@@ -1667,7 +1731,18 @@ export default function NutriDash() {
   }
   /** Misión 2: marca/desmarca el entrenamiento del día como completado. Sin efecto en días de descanso (ya cuentan solos). */
   function toggleDayCompleted(dayId) {
+    const day = days.find((d) => d.id === dayId);
+    if (!day) return;
+    if (!isEditableDate(day.date)) { toast("Solo puedes editar el día de hoy o ayer"); return; }
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, completed: !d.completed } : d)));
+    if (day.date !== todayISO()) toast("Misión de ayer actualizada correctamente");
+  }
+
+  /** Marca/desmarca hoy o ayer como día de descanso "rápido" (sin crear un día dentro de un bloque). */
+  function toggleQuickRestDay(dateStr) {
+    if (!isEditableDate(dateStr)) return;
+    setRestDayDates((prev) => (prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr]));
+    toast(dateStr === todayISO() ? "Día de descanso registrado" : "Misión de ayer actualizada correctamente");
   }
   function confirmEditDay() {
     if (!editDayItem) return;
@@ -1761,7 +1836,7 @@ export default function NutriDash() {
   function collectAllData() {
     return {
       profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates, restDayDates,
       nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets,
     };
@@ -1823,6 +1898,7 @@ export default function NutriDash() {
     setMeasurementFreq(d.measurementFreq ?? measurementFreq);
     setRecentFoodIds(d.recentFoodIds ?? recentFoodIds);
     setStepsCompletedDates(d.stepsCompletedDates ?? stepsCompletedDates);
+    setRestDayDates(d.restDayDates ?? restDayDates);
     setNutritionDate(d.nutritionDate ?? nutritionDate);
     setNutritionHistory(d.nutritionHistory ?? nutritionHistory);
     setCatalog(d.catalog ?? catalog);
@@ -1839,13 +1915,13 @@ export default function NutriDash() {
   useEffect(() => {
     const data = {
       profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates, restDayDates,
       nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
   }, [profile, steps, gymDays, activityMode, generalActivityLevel, goal, deficitAmount, surplusAmount, proteinPerKg, fatPercent,
-      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates,
+      foods, mealTemplates, mealCount, meals, account, weightLogs, measurementLogs, measurementFreq, recentFoodIds, stepsCompletedDates, restDayDates,
       nutritionDate, nutritionHistory,
       catalog, blocks, weeks, days, dayExercises, sets]);
 
@@ -1932,9 +2008,11 @@ export default function NutriDash() {
             const kcalTolerance = Math.max(100, targetCalories * 0.05);
             const nutritionMissionDone = Math.abs(totals.kcal - targetCalories) <= kcalTolerance;
 
-            // Misión 2 — Entrenamiento: ¿el día de hoy (si existe) está marcado como completado?
+            // Misión 2 — Entrenamiento: día programado completado, o marcado como descanso rápido desde el Dashboard.
+            const todayStr = todayISO();
+            const quickRestToday = restDayDates.includes(todayStr);
             const todaysWorkout = nextWorkout?.when === "Hoy" ? nextWorkout.day : null;
-            const trainingMissionDone = !!todaysWorkout?.completed;
+            const trainingMissionDone = quickRestToday || !!todaysWorkout?.completed || !!todaysWorkout?.isRestDay;
 
             // Misión 3 — Pasos: se compara contra la fecha de hoy, se "resetea" solo cada día.
             const stepsMissionDone = stepsCompletedDates.includes(todayISO());
@@ -1973,7 +2051,11 @@ export default function NutriDash() {
                   <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
                     <Dumbbell size={14} color="var(--accent)" /> Entrenamiento
                   </div>
-                  {nextWorkout ? (
+                  {quickRestToday ? (
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <Moon size={15} color="var(--accent2)" /> Hoy: Día de descanso <CheckCircle2 size={14} color="var(--success)" />
+                    </div>
+                  ) : nextWorkout ? (
                     trainingMissionDone ? (
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
                         <CheckCircle2 size={15} color="var(--success)" /> Entrenamiento de hoy logrado — {nextWorkout.day.name || "Día"}
@@ -1986,13 +2068,22 @@ export default function NutriDash() {
                   ) : (
                     <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No tienes días de entrenamiento programados.</div>
                   )}
-                  {todaysWorkout && (
+                  {todaysWorkout && !quickRestToday && (
                     <button
                       onClick={() => toggleDayCompleted(todaysWorkout.id)}
                       style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: trainingMissionDone ? "var(--success)" : "var(--panel2)", color: trainingMissionDone ? "#07060B" : "var(--text-dim)" }}
                     >
                       {trainingMissionDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
                       {trainingMissionDone ? "Completado hoy" : "Marcar como completado"}
+                    </button>
+                  )}
+                  {!todaysWorkout && (
+                    <button
+                      onClick={() => toggleQuickRestDay(todayStr)}
+                      style={{ marginTop: 10, width: "100%", padding: "8px", borderRadius: 8, border: quickRestToday ? "none" : "1px dashed var(--border)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontWeight: 700, fontSize: 12, background: quickRestToday ? "var(--success)" : "transparent", color: quickRestToday ? "#07060B" : "var(--accent2)" }}
+                    >
+                      {quickRestToday ? <CheckCircle2 size={14} /> : <Moon size={13} />}
+                      {quickRestToday ? "Día de descanso ✓ (toca para deshacer)" : "Es mi día de descanso 💤"}
                     </button>
                   )}
                 </Panel>
@@ -2018,7 +2109,7 @@ export default function NutriDash() {
             <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 12, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
               <CalendarClock size={14} color="var(--accent)" /> Calendario de consistencia
             </div>
-            <ConsistencyCalendar getDayStatus={getDayMissionStatus} />
+            <ConsistencyCalendar getDayStatus={getDayMissionStatus} onSelectDate={setEditMissionsDate} />
           </Panel>
         </div>
         )}
@@ -2031,6 +2122,29 @@ export default function NutriDash() {
               <MacroBar icon={Beef} label="Proteína" consumed={totals.p} target={targetProtein} color="var(--protein)" />
               <MacroBar icon={Wheat} label="Carbohidratos" consumed={totals.c} target={targetCarbs} color="var(--carbs)" />
               <MacroBar icon={Droplet} label="Grasas" consumed={totals.f} target={targetFat} color="var(--fat)" />
+            </div>
+          </Panel>
+
+          <Panel>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <Bell size={15} color="var(--accent)" style={{ flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Recordatorios de comida</div>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                    {notifPermission === "granted" && "Notificaciones activadas"}
+                    {notifPermission === "denied" && "Bloqueadas — actívalas desde ajustes del navegador"}
+                    {notifPermission === "default" && "Ponle hora a cada comida y activa las notificaciones"}
+                    {notifPermission === "unsupported" && "Tu navegador no las soporta"}
+                  </div>
+                </div>
+              </div>
+              {notifPermission !== "granted" && notifPermission !== "unsupported" && (
+                <button onClick={requestNotificationPermission} style={{ flexShrink: 0, padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--accent)", color: "#07060B", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  Activar
+                </button>
+              )}
+              {notifPermission === "granted" && <CheckCircle2 size={18} color="var(--success)" style={{ flexShrink: 0 }} />}
             </div>
           </Panel>
 
@@ -2049,6 +2163,16 @@ export default function NutriDash() {
                     style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 16, padding: 0, minWidth: 0, flex: 1, textDecoration: meal.completed ? "line-through" : "none", opacity: meal.completed ? 0.75 : 1 }}
                   />
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "var(--text-dim)", flexShrink: 0 }}>{round(mealTotal)} kcal</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  <Bell size={11} color="var(--text-dim)" />
+                  <input
+                    type="time"
+                    value={meal.reminderTime || ""}
+                    onChange={(e) => updateMealReminder(meal.id, e.target.value)}
+                    style={{ ...inputStyle, width: "auto", padding: "3px 7px", fontSize: 11, color: meal.reminderTime ? "var(--accent2)" : "var(--text-dim)" }}
+                  />
+                  <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{meal.reminderTime ? "recordatorio" : "sin recordatorio"}</span>
                 </div>
                 <div style={{ display: "flex", gap: 10, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>
                   <span style={{ color: "var(--protein)" }}>P {round(mealMacros.p)}g</span>
@@ -2932,6 +3056,70 @@ export default function NutriDash() {
           </div>
         </ModalShell>
       )}
+
+      {/* -------------------- MODAL: EDITAR MISIONES (hoy/ayer) -------------------- */}
+      {editMissionsDate && (() => {
+        const isToday = editMissionsDate === todayISO();
+        const scheduledDay = days.find((d) => d.date === editMissionsDate);
+        const stepsDone = stepsCompletedDates.includes(editMissionsDate);
+        const historyEntry = isToday ? null : nutritionHistory.find((h) => h.date === editMissionsDate);
+        const nutritionMeals = isToday ? meals : historyEntry?.meals ?? [];
+        return (
+          <ModalShell title={`Misiones — ${isToday ? "Hoy" : "Ayer"} (${formatDateEs(editMissionsDate)})`} onClose={() => setEditMissionsDate(null)}>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 14, lineHeight: 1.5 }}>
+              Puedes corregir tus checks de este día. Después de hoy y ayer, quedan bloqueados.
+            </div>
+
+            <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Nutrición</div>
+            {nutritionMeals.length === 0 ? (
+              <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 14 }}>Sin comidas registradas ese día.</div>
+            ) : (
+              <div style={{ marginBottom: 14 }}>
+                {nutritionMeals.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => (isToday ? toggleMealCompleted(m.id) : toggleHistoryMealCompleted(editMissionsDate, m.id))}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "6px 0", cursor: "pointer", color: "var(--text)" }}
+                  >
+                    {m.completed ? <CheckCircle2 size={16} color="var(--success)" /> : <Circle size={16} color="var(--text-dim)" />}
+                    <span style={{ fontSize: 13 }}>{m.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Entrenamiento</div>
+            {!scheduledDay ? (
+              <button
+                onClick={() => toggleQuickRestDay(editMissionsDate)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "6px 0", marginBottom: 14, cursor: "pointer", color: "var(--text)" }}
+              >
+                {restDayDates.includes(editMissionsDate) ? <CheckCircle2 size={16} color="var(--success)" /> : <Circle size={16} color="var(--text-dim)" />}
+                <span style={{ fontSize: 13 }}>Es mi día de descanso 💤</span>
+              </button>
+            ) : scheduledDay.isRestDay ? (
+              <div style={{ fontSize: 12, color: "var(--accent2)", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}><Moon size={14} /> Día de descanso — cuenta automático.</div>
+            ) : (
+              <button
+                onClick={() => toggleDayCompleted(scheduledDay.id)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "6px 0", marginBottom: 14, cursor: "pointer", color: "var(--text)" }}
+              >
+                {scheduledDay.completed ? <CheckCircle2 size={16} color="var(--success)" /> : <Circle size={16} color="var(--text-dim)" />}
+                <span style={{ fontSize: 13 }}>{scheduledDay.name || "Entrenamiento"}</span>
+              </button>
+            )}
+
+            <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Pasos</div>
+            <button
+              onClick={() => toggleStepsForDate(editMissionsDate)}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "6px 0", cursor: "pointer", color: "var(--text)" }}
+            >
+              {stepsDone ? <CheckCircle2 size={16} color="var(--success)" /> : <Circle size={16} color="var(--text-dim)" />}
+              <span style={{ fontSize: 13 }}>Meta de pasos cumplida</span>
+            </button>
+          </ModalShell>
+        );
+      })()}
 
       {/* -------------------- MODAL: CUENTA -------------------- */}
       {showAccountModal && (
