@@ -3,35 +3,35 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell, Leaf,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
    BASE DE ALIMENTOS (valores por 100 g, salvo que se indique)
 --------------------------------------------------------- */
 const FOOD_DB_INITIAL = [
-  { id: "f1", name: "Arroz blanco cocido", kcal: 130, p: 2.7, c: 28.2, f: 0.3, category: "carbohidrato" },
-  { id: "f2", name: "Pechuga de pollo cocida", kcal: 165, p: 31, c: 0, f: 3.6, category: "proteina" },
-  { id: "f3", name: "Huevo entero", kcal: 155, p: 13, c: 1.1, f: 11, category: "grasa" },
-  { id: "f4", name: "Avena", kcal: 389, p: 16.9, c: 66.3, f: 6.9, category: "carbohidrato" },
-  { id: "f5", name: "Pan integral", kcal: 247, p: 13, c: 41, f: 3.4, category: "carbohidrato" },
-  { id: "f6", name: "Atún en agua", kcal: 116, p: 26, c: 0, f: 1, category: "proteina" },
-  { id: "f7", name: "Frijoles negros cocidos", kcal: 132, p: 8.9, c: 23.7, f: 0.5, category: "carbohidrato" },
-  { id: "f8", name: "Aguacate", kcal: 160, p: 2, c: 8.5, f: 14.7, category: "grasa" },
-  { id: "f9", name: "Plátano", kcal: 89, p: 1.1, c: 22.8, f: 0.3, category: "carbohidrato" },
-  { id: "f10", name: "Almendras", kcal: 579, p: 21, c: 22, f: 50, category: "grasa" },
-  { id: "f11", name: "Leche entera", kcal: 61, p: 3.2, c: 4.8, f: 3.3, category: "grasa" },
-  { id: "f12", name: "Yogur griego natural", kcal: 59, p: 10, c: 3.6, f: 0.4, category: "proteina" },
-  { id: "f13", name: "Salmón", kcal: 208, p: 20, c: 0, f: 13, category: "grasa" },
-  { id: "f14", name: "Carne de res molida 90/10", kcal: 176, p: 20, c: 0, f: 10, category: "grasa" },
-  { id: "f15", name: "Tortilla de maíz", kcal: 218, p: 5.7, c: 44.6, f: 2.3, category: "carbohidrato" },
-  { id: "f16", name: "Camote cocido", kcal: 90, p: 2, c: 20.7, f: 0.1, category: "carbohidrato" },
-  { id: "f17", name: "Brócoli", kcal: 34, p: 2.8, c: 6.6, f: 0.4, category: "carbohidrato" },
-  { id: "f18", name: "Queso panela", kcal: 250, p: 18, c: 3, f: 19, category: "grasa" },
-  { id: "f19", name: "Mantequilla de maní", kcal: 588, p: 25, c: 20, f: 50, category: "grasa" },
-  { id: "f20", name: "Lentejas cocidas", kcal: 116, p: 9, c: 20, f: 0.4, category: "carbohidrato" },
+  { id: "f1", name: "Arroz blanco cocido", kcal: 130, p: 2.7, c: 28.2, f: 0.3, fiber: 0.4, category: "carbohidrato" },
+  { id: "f2", name: "Pechuga de pollo cocida", kcal: 165, p: 31, c: 0, f: 3.6, fiber: 0, category: "proteina" },
+  { id: "f3", name: "Huevo entero", kcal: 155, p: 13, c: 1.1, f: 11, fiber: 0, category: "grasa" },
+  { id: "f4", name: "Avena", kcal: 389, p: 16.9, c: 66.3, f: 6.9, fiber: 10.6, category: "carbohidrato" },
+  { id: "f5", name: "Pan integral", kcal: 247, p: 13, c: 41, f: 3.4, fiber: 6.8, category: "carbohidrato" },
+  { id: "f6", name: "Atún en agua", kcal: 116, p: 26, c: 0, f: 1, fiber: 0, category: "proteina" },
+  { id: "f7", name: "Frijoles negros cocidos", kcal: 132, p: 8.9, c: 23.7, f: 0.5, fiber: 8.7, category: "carbohidrato" },
+  { id: "f8", name: "Aguacate", kcal: 160, p: 2, c: 8.5, f: 14.7, fiber: 6.7, category: "grasa" },
+  { id: "f9", name: "Plátano", kcal: 89, p: 1.1, c: 22.8, f: 0.3, fiber: 2.6, category: "carbohidrato" },
+  { id: "f10", name: "Almendras", kcal: 579, p: 21, c: 22, f: 50, fiber: 12.5, category: "grasa" },
+  { id: "f11", name: "Leche entera", kcal: 61, p: 3.2, c: 4.8, f: 3.3, fiber: 0, category: "grasa" },
+  { id: "f12", name: "Yogur griego natural", kcal: 59, p: 10, c: 3.6, f: 0.4, fiber: 0, category: "proteina" },
+  { id: "f13", name: "Salmón", kcal: 208, p: 20, c: 0, f: 13, fiber: 0, category: "grasa" },
+  { id: "f14", name: "Carne de res molida 90/10", kcal: 176, p: 20, c: 0, f: 10, fiber: 0, category: "grasa" },
+  { id: "f15", name: "Tortilla de maíz", kcal: 218, p: 5.7, c: 44.6, f: 2.3, fiber: 4.9, category: "carbohidrato" },
+  { id: "f16", name: "Camote cocido", kcal: 90, p: 2, c: 20.7, f: 0.1, fiber: 3.3, category: "carbohidrato" },
+  { id: "f17", name: "Brócoli", kcal: 34, p: 2.8, c: 6.6, f: 0.4, fiber: 2.6, category: "carbohidrato" },
+  { id: "f18", name: "Queso panela", kcal: 250, p: 18, c: 3, f: 19, fiber: 0, category: "grasa" },
+  { id: "f19", name: "Mantequilla de maní", kcal: 588, p: 25, c: 20, f: 50, fiber: 6, category: "grasa" },
+  { id: "f20", name: "Lentejas cocidas", kcal: 116, p: 9, c: 20, f: 0.4, fiber: 7.9, category: "carbohidrato" },
   // valores de la etiqueta real del producto (San Juan, claras líquidas pasteurizadas): 42 kcal / 100 ml
-  { id: "f21", name: "Claras de huevo líquidas (San Juan)", kcal: 42, p: 10, c: 1, f: 0, category: "proteina" },
+  { id: "f21", name: "Claras de huevo líquidas (San Juan)", kcal: 42, p: 10, c: 1, f: 0, fiber: 0, category: "proteina" },
 ];
 
 const MACRO_CATEGORIES = [
@@ -39,6 +39,7 @@ const MACRO_CATEGORIES = [
   { value: "carbohidrato", label: "Carbohidrato", color: "var(--carbs)", key: "c" },
   { value: "grasa", label: "Grasa", color: "var(--fat)", key: "f" },
 ];
+const FIBER_TARGET = 30; // g/día — recomendación general (no personalizada por perfil)
 
 /** Escala un alimento (valores por 100g) a una cantidad en gramos. */
 function scaleFood(food, grams) {
@@ -1036,6 +1037,7 @@ export default function NutriDash() {
   const notifiedTodayRef = useRef(new Set());
   const [nutritionHistory, setNutritionHistory] = useState(stored.nutritionHistory ?? []); // {date, meals, totals}
   const [historyOpenDate, setHistoryOpenDate] = useState(null);
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
 
   useEffect(() => {
     setMeals((prev) => {
@@ -1112,6 +1114,11 @@ export default function NutriDash() {
   const [recentPortionFood, setRecentPortionFood] = useState(null);
   const [recentPortionDraft, setRecentPortionDraft] = useState("100");
 
+  const [showFoodEditor, setShowFoodEditor] = useState(false);
+  const [editFoodSearch, setEditFoodSearch] = useState("");
+  const [editingFood, setEditingFood] = useState(null); // alimento seleccionado para corregir sus valores
+  const [editFoodDraft, setEditFoodDraft] = useState(null);
+
   const [showScanner, setShowScanner] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState(null);
@@ -1121,7 +1128,7 @@ export default function NutriDash() {
   const streamRef = useRef(null);
   const scanIntervalRef = useRef(null);
   const [showCustomForm, setShowCustomForm] = useState(false);
-  const [customForm, setCustomForm] = useState({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
+  const [customForm, setCustomForm] = useState({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", fiber: "", sodium: "", sugar: "", image: null, category: "proteina" });
   const [customError, setCustomError] = useState("");
   const fileInputRef = useRef(null);
 
@@ -1189,6 +1196,10 @@ export default function NutriDash() {
   const [addDayIsRest, setAddDayIsRest] = useState(false);
   const [editDayItem, setEditDayItem] = useState(null);
   const [editDayDraft, setEditDayDraft] = useState({ name: "", date: "", isRestDay: false });
+  const [copyDayId, setCopyDayId] = useState(null);
+  const [copyDayScope, setCopyDayScope] = useState("same"); // 'same' | 'other'
+  const [copyDayTargetWeekId, setCopyDayTargetWeekId] = useState(null);
+  const [copyDayDate, setCopyDayDate] = useState(todayISO());
 
   const [exercisePickerDayId, setExercisePickerDayId] = useState(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
@@ -1220,9 +1231,9 @@ export default function NutriDash() {
 
   /** Solo las comidas marcadas con el check cuentan como "consumidas" — el resto queda pendiente aunque tengan alimentos. */
   const totals = useMemo(() => {
-    let kcal = 0, p = 0, c = 0, f = 0;
-    meals.filter((meal) => meal.completed).forEach((meal) => meal.items.forEach((it) => { kcal += it.kcal; p += it.p; c += it.c; f += it.f; }));
-    return { kcal, p, c, f };
+    let kcal = 0, p = 0, c = 0, f = 0, fiber = 0;
+    meals.filter((meal) => meal.completed).forEach((meal) => meal.items.forEach((it) => { kcal += it.kcal; p += it.p; c += it.c; f += it.f; fiber += it.fiber || 0; }));
+    return { kcal, p, c, f, fiber };
   }, [meals]);
 
   /** Reseteo diario: si cambió la fecha LOCAL, archiva el día anterior a nutritionHistory y limpia el checklist/comidas de hoy. */
@@ -1324,7 +1335,11 @@ export default function NutriDash() {
     const grams = gramsOverride ?? pickerGrams[food.id] ?? 100;
     if (!grams || grams <= 0) return;
     const factor = grams / 100;
-    const item = { id: uid(), name: food.name, grams, kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor, icon: food.icon, image: food.image };
+    const item = {
+      id: uid(), name: food.name, grams, kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor,
+      fiber: (food.fiber || 0) * factor, sodium: (food.sodium || 0) * factor, sugar: (food.sugar || 0) * factor,
+      icon: food.icon, image: food.image,
+    };
     setMeals((prev) => prev.map((m) => (m.id === pickerMeal ? { ...m, items: [...m.items, item] } : m)));
     setRecentFoodIds((prev) => [food.id, ...prev.filter((id) => id !== food.id)].slice(0, 8));
     setPickerMeal(null);
@@ -1378,6 +1393,9 @@ export default function NutriDash() {
         p: Number(n["proteins_100g"]) || 0,
         c: Number(n["carbohydrates_100g"]) || 0,
         f: Number(n["fat_100g"]) || 0,
+        fiber: Number(n["fiber_100g"]) || 0,
+        sodium: Number(n["sodium_100g"]) ? Number(n["sodium_100g"]) * 1000 : 0, // OFF da sodio en g, lo pasamos a mg
+        sugar: Number(n["sugars_100g"]) || 0,
         image: data.product.image_front_small_url || data.product.image_url || null,
       });
       setScanPortionDraft("100");
@@ -1427,7 +1445,11 @@ export default function NutriDash() {
     const grams = Number(scanPortionDraft);
     if (!scannedProduct || !grams || grams <= 0) return;
     const category = inferCategory(scannedProduct);
-    const newFood = { id: uid(), name: scannedProduct.name, kcal: scannedProduct.kcal, p: scannedProduct.p, c: scannedProduct.c, f: scannedProduct.f, image: scannedProduct.image, category, custom: true };
+    const newFood = {
+      id: uid(), name: scannedProduct.name, kcal: scannedProduct.kcal, p: scannedProduct.p, c: scannedProduct.c, f: scannedProduct.f,
+      fiber: scannedProduct.fiber || 0, sodium: scannedProduct.sodium || 0, sugar: scannedProduct.sugar || 0,
+      image: scannedProduct.image, category, custom: true,
+    };
     setFoods((prev) => [newFood, ...prev]);
     closeScanner();
     addFoodFromPicker(newFood, grams);
@@ -1436,16 +1458,45 @@ export default function NutriDash() {
   // Apaga la cámara si el componente se desmonta con el escáner abierto.
   useEffect(() => () => stopBarcodeScanner(), []);
 
+  /** Abre el formulario de corrección de un alimento existente (precargado o personalizado) con sus valores por 100g. */
+  function startEditingFood(food) {
+    setEditingFood(food);
+    setEditFoodDraft({
+      name: food.name,
+      kcal: String(round(food.kcal, 1)), p: String(round(food.p, 1)), c: String(round(food.c, 1)), f: String(round(food.f, 1)),
+      fiber: String(round(food.fiber || 0, 1)), sodium: String(round(food.sodium || 0, 1)), sugar: String(round(food.sugar || 0, 1)),
+      category: food.category || "proteina",
+    });
+  }
+
+  /** Guarda los valores corregidos (siempre por 100g) sobre el alimento existente en `foods`. */
+  function saveFoodEdit() {
+    if (!editingFood || !editFoodDraft) return;
+    const d = editFoodDraft;
+    if (!d.name.trim() || [d.kcal, d.p, d.c, d.f, d.fiber].some((v) => v === "" || isNaN(Number(v)) || Number(v) < 0)) return;
+    setFoods((prev) => prev.map((f) => (f.id === editingFood.id ? {
+      ...f, name: d.name.trim(), kcal: Number(d.kcal), p: Number(d.p), c: Number(d.c), f: Number(d.f),
+      fiber: Number(d.fiber), sodium: Number(d.sodium) || 0, sugar: Number(d.sugar) || 0, category: d.category,
+    } : f)));
+    toast(`"${d.name.trim()}" actualizado`);
+    setEditingFood(null);
+    setEditFoodDraft(null);
+  }
+
   function addCustomFood() {
-    const { name, portion, kcal, p, c, f, image, category } = customForm;
+    const { name, portion, kcal, p, c, f, fiber, sodium, sugar, image, category } = customForm;
     if (!name.trim() || !portion || Number(portion) <= 0) { setCustomError("Ponle nombre y un tamaño de porción válido."); return; }
-    if ([kcal, p, c, f].some((v) => v === "" || isNaN(Number(v)) || Number(v) < 0)) { setCustomError("Revisa que calorías, proteína, carbos y grasas sean números válidos."); return; }
+    if ([kcal, p, c, f, fiber].some((v) => v === "" || isNaN(Number(v)) || Number(v) < 0)) { setCustomError("Revisa que calorías, proteína, carbos, grasas y fibra sean números válidos."); return; }
     if (!category) { setCustomError("Elige la categoría del alimento."); return; }
     const factor = 100 / Number(portion);
-    const newFood = { id: uid(), name: name.trim(), kcal: Number(kcal) * factor, p: Number(p) * factor, c: Number(c) * factor, f: Number(f) * factor, custom: true, image: image || null, category };
+    const newFood = {
+      id: uid(), name: name.trim(), kcal: Number(kcal) * factor, p: Number(p) * factor, c: Number(c) * factor, f: Number(f) * factor, fiber: Number(fiber) * factor,
+      sodium: (Number(sodium) || 0) * factor, sugar: (Number(sugar) || 0) * factor,
+      custom: true, image: image || null, category,
+    };
     setFoods((prev) => [newFood, ...prev]);
     addFoodFromPicker(newFood); // se agrega directo a la comida y cierra el modal + toast
-    setCustomForm({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", image: null, category: "proteina" });
+    setCustomForm({ name: "", portion: 100, kcal: "", p: "", c: "", f: "", fiber: "", sodium: "", sugar: "", image: null, category: "proteina" });
     setCustomError("");
     setShowCustomForm(false);
   }
@@ -1692,7 +1743,7 @@ export default function NutriDash() {
     const newDayExercises = [];
 
     sourceDays.forEach((sourceDay) => {
-      const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(sourceDay.date, 7), order: sourceDay.order, completed: false, isRestDay: !!sourceDay.isRestDay };
+      const newDay = { id: uid(), weekId: newWeek.id, date: addDaysToDate(sourceDay.date, 7), order: sourceDay.order, name: sourceDay.name, completed: false, isRestDay: !!sourceDay.isRestDay };
       newDays.push(newDay);
       getExercisesForDay(sourceDay.id).forEach((sourceEx) => {
         newDayExercises.push({
@@ -1758,6 +1809,32 @@ export default function NutriDash() {
     setDayExercises((prev) => prev.filter((e) => e.dayId !== dayId));
     setSets((prev) => prev.filter((s) => !exIds.includes(s.dayExerciseId)));
     if (selectedDayId === dayId) setSelectedDayId(null);
+  }
+
+  /** Copia un día completo (mismo nombre, ejercicios, series con peso/reps/RIR ya configurados) a la semana actual u otra del bloque. */
+  function duplicateDay(sourceDayId, targetWeekId, newDate) {
+    const sourceDay = days.find((d) => d.id === sourceDayId);
+    if (!sourceDay || !targetWeekId || !newDate) return;
+    const order = getDaysForWeek(targetWeekId).length;
+    const newDay = { id: uid(), weekId: targetWeekId, date: newDate, order, name: sourceDay.name, completed: false, isRestDay: !!sourceDay.isRestDay };
+    const newExercises = [];
+    const newSets = [];
+    getExercisesForDay(sourceDay.id).forEach((ex) => {
+      const newEx = { id: uid(), dayId: newDay.id, catalogExerciseId: ex.catalogExerciseId, variantName: ex.variantName, order: ex.order, sourceDayExerciseId: null };
+      newExercises.push(newEx);
+      getSetsForExercise(ex.id).forEach((s) => {
+        newSets.push({ id: uid(), dayExerciseId: newEx.id, order: s.order, weight: s.weight, unit: s.unit, reps: s.reps, rir: s.rir });
+      });
+    });
+    setDays((prev) => [...prev, newDay]);
+    setDayExercises((prev) => [...prev, ...newExercises]);
+    setSets((prev) => [...prev, ...newSets]);
+    toast(`"${newDay.name || "Día"}" copiado correctamente`);
+  }
+
+  function confirmCopyDay() {
+    duplicateDay(copyDayId, copyDayTargetWeekId, copyDayDate);
+    setCopyDayId(null);
   }
 
   function updateExerciseVariant(dayExerciseId, variantName) {
@@ -2122,8 +2199,16 @@ export default function NutriDash() {
               <MacroBar icon={Beef} label="Proteína" consumed={totals.p} target={targetProtein} color="var(--protein)" />
               <MacroBar icon={Wheat} label="Carbohidratos" consumed={totals.c} target={targetCarbs} color="var(--carbs)" />
               <MacroBar icon={Droplet} label="Grasas" consumed={totals.f} target={targetFat} color="var(--fat)" />
+              <MacroBar icon={Leaf} label="Fibra" consumed={totals.fiber} target={FIBER_TARGET} color="var(--accent2)" />
             </div>
           </Panel>
+
+          <button
+            onClick={() => { setShowFoodEditor(true); setEditFoodSearch(""); setEditingFood(null); }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px", borderRadius: 9, border: "1px dashed var(--accent2)55", background: "var(--accent2)0D", color: "var(--accent2)", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+          >
+            <Pencil size={13} /> Editar valores de un alimento
+          </button>
 
           <Panel>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -2150,7 +2235,7 @@ export default function NutriDash() {
 
           {meals.map((meal) => {
             const mealTotal = meal.items.reduce((s, i) => s + i.kcal, 0);
-            const mealMacros = meal.items.reduce((a, i) => ({ p: a.p + i.p, c: a.c + i.c, f: a.f + i.f }), { p: 0, c: 0, f: 0 });
+            const mealMacros = meal.items.reduce((a, i) => ({ p: a.p + i.p, c: a.c + i.c, f: a.f + i.f, fiber: a.fiber + (i.fiber || 0) }), { p: 0, c: 0, f: 0, fiber: 0 });
             return (
               <Panel key={meal.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
@@ -2178,6 +2263,7 @@ export default function NutriDash() {
                   <span style={{ color: "var(--protein)" }}>P {round(mealMacros.p)}g</span>
                   <span style={{ color: "var(--carbs)" }}>C {round(mealMacros.c)}g</span>
                   <span style={{ color: "var(--fat)" }}>G {round(mealMacros.f)}g</span>
+                  <span style={{ color: "var(--accent2)" }}>F {round(mealMacros.fiber)}g</span>
                 </div>
 
                 {meal.items.length > 0 && (
@@ -2193,7 +2279,7 @@ export default function NutriDash() {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                             <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                              {item.grams} g · {round(item.kcal)} kcal · P {round(item.p)}g · C {round(item.c)}g · G {round(item.f)}g
+                              {item.grams} g · {round(item.kcal)} kcal · P {round(item.p)}g · C {round(item.c)}g · G {round(item.f)}g · F {round(item.fiber || 0)}g
                             </div>
                           </div>
                         </div>
@@ -2224,17 +2310,39 @@ export default function NutriDash() {
           {/* -------- Historial de días pasados -------- */}
           {nutritionHistory.length > 0 && (
             <Panel>
-              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-                Historial de días pasados
+              <div
+                onClick={() => setHistoryPanelOpen((o) => !o)}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", marginBottom: historyPanelOpen ? 10 : 0 }}
+              >
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Historial de días pasados
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace" }}>{nutritionHistory.length} día{nutritionHistory.length !== 1 ? "s" : ""}</span>
+                  {historyPanelOpen ? <ChevronUp size={16} color="var(--text-dim)" /> : <ChevronDown size={16} color="var(--text-dim)" />}
+                </div>
               </div>
+              <div style={{ maxHeight: historyPanelOpen ? 4000 : 0, opacity: historyPanelOpen ? 1 : 0, overflow: "hidden", transition: "max-height .35s ease, opacity .25s ease" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[...nutritionHistory].sort((a, b) => b.date.localeCompare(a.date)).map((day) => {
                   const open = historyOpenDate === day.date;
+                  const tol = Math.max(100, targetCalories * 0.05);
+                  const fulfilled = Math.abs(day.totals.kcal - targetCalories) <= tol;
                   return (
                     <div key={day.date} style={{ border: "1px solid var(--border)", borderRadius: 10, background: "var(--panel2)", overflow: "hidden" }}>
                       <div onClick={() => setHistoryOpenDate(open ? null : day.date)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", cursor: "pointer" }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{formatDateEs(day.date)}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{formatDateEs(day.date)}</div>
+                          <span style={{
+                            fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 20, flexShrink: 0,
+                            color: fulfilled ? "var(--success)" : "var(--fat)",
+                            background: fulfilled ? "var(--success)1A" : "var(--fat)1A",
+                            border: `1px solid ${fulfilled ? "var(--success)" : "var(--fat)"}55`,
+                          }}>
+                            {fulfilled ? "Cumplido" : "Incompleto"}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--text-dim)" }}>{round(day.totals.kcal)} kcal</div>
                           <button
                             onClick={(e) => { e.stopPropagation(); askConfirm(`¿Eliminar el registro del ${formatDateEs(day.date)} del historial?`, () => removeHistoryDay(day.date)); }}
@@ -2245,12 +2353,13 @@ export default function NutriDash() {
                           {open ? <ChevronUp size={16} color="var(--text-dim)" /> : <ChevronDown size={16} color="var(--text-dim)" />}
                         </div>
                       </div>
-                      {open && (
+                      <div style={{ maxHeight: open ? 2000 : 0, opacity: open ? 1 : 0, overflow: "hidden", transition: "max-height .35s ease, opacity .25s ease" }}>
                         <div style={{ padding: "0 12px 12px" }}>
-                          <div style={{ display: "flex", gap: 12, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>
+                          <div style={{ display: "flex", gap: 12, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", marginBottom: 10, flexWrap: "wrap" }}>
                             <span style={{ color: "var(--protein)" }}>P {round(day.totals.p)}g</span>
                             <span style={{ color: "var(--carbs)" }}>C {round(day.totals.c)}g</span>
                             <span style={{ color: "var(--fat)" }}>G {round(day.totals.f)}g</span>
+                            <span style={{ color: "var(--accent2)" }}>F {round(day.totals.fiber || 0)}g</span>
                           </div>
                           {day.meals.filter((m) => m.items.length > 0).map((m) => (
                             <div key={m.id} style={{ marginBottom: 8 }}>
@@ -2271,10 +2380,11 @@ export default function NutriDash() {
                             <Copy size={14} /> Usar estas comidas hoy
                           </button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
+              </div>
               </div>
             </Panel>
           )}
@@ -2557,6 +2667,13 @@ export default function NutriDash() {
                       onChange={(e) => setDays((prev) => prev.map((d) => (d.id === day.id ? { ...d, date: e.target.value } : d)))}
                       style={{ ...inputStyle, width: 140, flexShrink: 0, padding: "6px 8px", fontSize: 12.5 }}
                     />
+                    <button
+                      onClick={() => { setCopyDayId(day.id); setCopyDayScope("same"); setCopyDayTargetWeekId(day.weekId); setCopyDayDate(addDaysToDate(day.date, 1)); }}
+                      title="Copiar día"
+                      style={{ ...iconBtnStyle, flexShrink: 0, color: "var(--accent2)" }}
+                    >
+                      <Copy size={14} />
+                    </button>
                     <button onClick={() => askConfirm(`¿Eliminar el día "${day.name || "Día"}" y sus ejercicios?`, () => removeDay(day.id))} style={{ ...iconBtnStyle, flexShrink: 0, color: "var(--danger)" }}><Trash2 size={14} /></button>
                   </div>
                   {day.isRestDay ? (
@@ -2953,6 +3070,9 @@ export default function NutriDash() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", flex: 1 }}>
               <Search size={15} color="var(--text-dim)" />
               <input value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+              <button onClick={() => { setShowFoodEditor(true); setEditFoodSearch(""); setEditingFood(null); }} title="Editar alimentos" style={{ background: "var(--accent2)1A", border: "1px solid var(--accent2)55", borderRadius: 6, cursor: "pointer", color: "var(--accent2)", padding: 4, display: "flex", flexShrink: 0 }}>
+                <Pencil size={14} />
+              </button>
             </div>
             <button onClick={startBarcodeScanner} title="Escanear código de barras" style={{ width: 38, height: 38, borderRadius: 9, border: "1px solid var(--accent2)55", background: "var(--accent2)1A", color: "var(--accent2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
               <ScanLine size={17} />
@@ -3015,6 +3135,9 @@ export default function NutriDash() {
                 <Field label="Proteína (g)"><input type="number" style={inputStyle} value={customForm.p} onChange={(e) => setCustomForm((f) => ({ ...f, p: e.target.value }))} /></Field>
                 <Field label="Carbohidratos (g)"><input type="number" style={inputStyle} value={customForm.c} onChange={(e) => setCustomForm((f) => ({ ...f, c: e.target.value }))} /></Field>
                 <Field label="Grasas (g)"><input type="number" style={inputStyle} value={customForm.f} onChange={(e) => setCustomForm((f) => ({ ...f, f: e.target.value }))} /></Field>
+                <Field label="Fibra (g)"><input type="number" style={inputStyle} value={customForm.fiber} onChange={(e) => setCustomForm((f) => ({ ...f, fiber: e.target.value }))} /></Field>
+                <Field label="Sodio (mg, opcional)"><input type="number" style={inputStyle} value={customForm.sodium} onChange={(e) => setCustomForm((f) => ({ ...f, sodium: e.target.value }))} /></Field>
+                <Field label="Azúcar (g, opcional)"><input type="number" style={inputStyle} value={customForm.sugar} onChange={(e) => setCustomForm((f) => ({ ...f, sugar: e.target.value }))} /></Field>
               </div>
               {customError && <div style={{ color: "var(--danger)", fontSize: 12, marginBottom: 10 }}>{customError}</div>}
               <button onClick={addCustomFood} style={{ width: "100%", padding: "11px", borderRadius: 9, border: "none", background: "var(--accent2)", color: "#07060B", fontWeight: 700, fontSize: 13.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
@@ -3044,6 +3167,7 @@ export default function NutriDash() {
                       <span style={{ color: "var(--protein)" }}>P {round(f.p * factor)}g</span>
                       <span style={{ color: "var(--carbs)" }}>C {round(f.c * factor)}g</span>
                       <span style={{ color: "var(--fat)" }}>G {round(f.f * factor)}g</span>
+                      <span style={{ color: "var(--accent2)" }}>F {round((f.fiber || 0) * factor)}g</span>
                     </div>
                     <button onClick={() => addFoodFromPicker(f)} style={{ background: "var(--accent)", border: "none", borderRadius: 7, padding: "5px 10px", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
                       <Plus size={13} /> Agregar
@@ -3150,6 +3274,58 @@ export default function NutriDash() {
         </ModalShell>
       )}
 
+      {/* -------------------- MODAL: EDITOR DE ALIMENTOS -------------------- */}
+      {showFoodEditor && (
+        <ModalShell
+          title={editingFood ? `Editar "${editingFood.name}"` : "Editar alimentos"}
+          onClose={() => { setShowFoodEditor(false); setEditingFood(null); setEditFoodDraft(null); }}
+        >
+          {!editingFood ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
+                <Search size={15} color="var(--text-dim)" />
+                <input value={editFoodSearch} onChange={(e) => setEditFoodSearch(e.target.value)} placeholder="Buscar alimento a corregir..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: "50vh", overflowY: "auto" }}>
+                {foods.filter((f) => f.name.toLowerCase().includes(editFoodSearch.toLowerCase())).map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => startEditingFood(f)}
+                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", color: "var(--text)" }}
+                  >
+                    <span style={{ fontSize: 13, textAlign: "left" }}>{f.name}</span>
+                    <Pencil size={13} color="var(--text-dim)" style={{ flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Nombre">
+                <input style={selectStyle} value={editFoodDraft.name} onChange={(e) => setEditFoodDraft((d) => ({ ...d, name: e.target.value }))} />
+              </Field>
+              <Field label="Categoría">
+                <ToggleGroup options={MACRO_CATEGORIES} value={editFoodDraft.category} onChange={(v) => setEditFoodDraft((d) => ({ ...d, category: v }))} />
+              </Field>
+              <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginBottom: 6 }}>Valores por 100g</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field label="Calorías"><input type="number" style={inputStyle} value={editFoodDraft.kcal} onChange={(e) => setEditFoodDraft((d) => ({ ...d, kcal: e.target.value }))} /></Field>
+                <Field label="Proteína (g)"><input type="number" style={inputStyle} value={editFoodDraft.p} onChange={(e) => setEditFoodDraft((d) => ({ ...d, p: e.target.value }))} /></Field>
+                <Field label="Carbohidratos (g)"><input type="number" style={inputStyle} value={editFoodDraft.c} onChange={(e) => setEditFoodDraft((d) => ({ ...d, c: e.target.value }))} /></Field>
+                <Field label="Grasas (g)"><input type="number" style={inputStyle} value={editFoodDraft.f} onChange={(e) => setEditFoodDraft((d) => ({ ...d, f: e.target.value }))} /></Field>
+                <Field label="Fibra (g)"><input type="number" style={inputStyle} value={editFoodDraft.fiber} onChange={(e) => setEditFoodDraft((d) => ({ ...d, fiber: e.target.value }))} /></Field>
+                <Field label="Sodio (mg, opcional)"><input type="number" style={inputStyle} value={editFoodDraft.sodium} onChange={(e) => setEditFoodDraft((d) => ({ ...d, sodium: e.target.value }))} /></Field>
+                <Field label="Azúcar (g, opcional)"><input type="number" style={inputStyle} value={editFoodDraft.sugar} onChange={(e) => setEditFoodDraft((d) => ({ ...d, sugar: e.target.value }))} /></Field>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button onClick={() => { setEditingFood(null); setEditFoodDraft(null); }} style={{ flex: 1, padding: "10px", borderRadius: 9, border: "1px solid var(--border)", background: "transparent", color: "var(--text)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Atrás</button>
+                <button onClick={saveFoodEdit} style={{ flex: 2, padding: "10px", borderRadius: 9, border: "none", background: "var(--accent2)", color: "#07060B", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Guardar corrección</button>
+              </div>
+            </>
+          )}
+        </ModalShell>
+      )}
+
       {/* -------------------- MODAL: ESCANEAR CÓDIGO DE BARRAS -------------------- */}
       {showScanner && (
         <ModalShell title="Escanear código de barras" onClose={closeScanner}>
@@ -3186,6 +3362,7 @@ export default function NutriDash() {
                 <span style={{ color: "var(--protein)" }}>P {round(scannedProduct.p)}g</span>
                 <span style={{ color: "var(--carbs)" }}>C {round(scannedProduct.c)}g</span>
                 <span style={{ color: "var(--fat)" }}>G {round(scannedProduct.f)}g</span>
+                <span style={{ color: "var(--accent2)" }}>F {round(scannedProduct.fiber)}g</span>
               </div>
               <Field label="Gramos">
                 <input type="number" style={inputStyle} value={scanPortionDraft} onChange={(e) => setScanPortionDraft(e.target.value)} />
@@ -3211,6 +3388,7 @@ export default function NutriDash() {
                 <span style={{ color: "var(--protein)" }}>P {round(recentPortionFood.p * factor)}g</span>
                 <span style={{ color: "var(--carbs)" }}>C {round(recentPortionFood.c * factor)}g</span>
                 <span style={{ color: "var(--fat)" }}>G {round(recentPortionFood.f * factor)}g</span>
+                <span style={{ color: "var(--accent2)" }}>F {round((recentPortionFood.fiber || 0) * factor)}g</span>
               </div>
             );
           })()}
@@ -3340,6 +3518,45 @@ export default function NutriDash() {
           <button onClick={confirmDuplicateWeek} style={primaryButtonStyle}><Copy size={16} /> Duplicar</button>
         </ModalShell>
       )}
+
+      {/* -------------------- MODAL: COPIAR DÍA -------------------- */}
+      {copyDayId && (() => {
+        const sourceDay = days.find((d) => d.id === copyDayId);
+        const blockId = weeks.find((w) => w.id === sourceDay?.weekId)?.blockId;
+        const blockWeeks = blockId ? getWeeksForBlock(blockId) : [];
+        const otherWeeks = blockWeeks.filter((w) => w.id !== sourceDay?.weekId);
+        return (
+          <ModalShell title={`Copiar "${sourceDay?.name || "Día"}"`} onClose={() => setCopyDayId(null)}>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 14, lineHeight: 1.5 }}>
+              Se copian el nombre, los ejercicios y sus series con peso/reps/RIR tal como están ahora.
+            </div>
+            <Field label="Destino">
+              <ToggleGroup
+                options={[{ value: "same", label: "Esta semana" }, { value: "other", label: "Otra semana" }]}
+                value={copyDayScope}
+                onChange={(v) => { setCopyDayScope(v); setCopyDayTargetWeekId(v === "same" ? sourceDay.weekId : otherWeeks[0]?.id ?? null); }}
+              />
+            </Field>
+            {copyDayScope === "other" && (
+              otherWeeks.length === 0 ? (
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 14 }}>No hay otra semana en este bloque todavía.</div>
+              ) : (
+                <Field label="Semana destino">
+                  <select style={selectStyle} value={copyDayTargetWeekId ?? ""} onChange={(e) => setCopyDayTargetWeekId(e.target.value)}>
+                    {otherWeeks.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+                  </select>
+                </Field>
+              )
+            )}
+            <Field label="Fecha del nuevo día">
+              <input type="date" style={inputStyle} value={copyDayDate} onChange={(e) => setCopyDayDate(e.target.value)} />
+            </Field>
+            <button onClick={confirmCopyDay} disabled={!copyDayTargetWeekId} style={{ ...primaryButtonStyle, opacity: copyDayTargetWeekId ? 1 : 0.5 }}>
+              <Copy size={16} /> Copiar día
+            </button>
+          </ModalShell>
+        );
+      })()}
 
       {/* -------------------- MODAL: EDITAR DÍA (swipe derecha) -------------------- */}
       {editDayItem && (
