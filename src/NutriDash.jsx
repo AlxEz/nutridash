@@ -135,7 +135,7 @@ const DEFAULT_EXERCISE_CATALOG = [
   { name: "Pullover", targets: t1("Dorsales") },
   // Espalda Alta / Trapecios
   { name: "Encogimientos (shrugs)", targets: t1("Espalda Alta/Trapecios") },
-  { name: "Remo alto", targets: t2("Espalda Alta/Trapecios", "Hombro") },
+  { name: "Remo alto", targets: t2("Espalda Alta/Trapecios", "Deltoides Lateral") },
   { name: "Remo Pendlay", targets: t2("Espalda Alta/Trapecios", "Dorsales") },
   // Espalda Baja / Lumbares
   { name: "Peso muerto convencional", targets: t3("Espalda Baja/Lumbares", "Isquiotibiales/Femoral", "Glúteos") },
@@ -143,15 +143,17 @@ const DEFAULT_EXERCISE_CATALOG = [
   { name: "Superman", targets: t1("Espalda Baja/Lumbares") },
   { name: "Buenos días", targets: t2("Espalda Baja/Lumbares", "Isquiotibiales/Femoral") },
   // Pecho
-  { name: "Press de banca", targets: t3("Pecho", "Tríceps", "Hombro") },
-  { name: "Press inclinado", targets: t3("Pecho", "Hombro", "Tríceps") },
+  { name: "Press de banca", targets: t3("Pecho", "Tríceps", "Deltoides Anterior") },
+  { name: "Press inclinado", targets: t3("Pecho", "Deltoides Anterior", "Tríceps") },
   { name: "Press declinado", targets: t2("Pecho", "Tríceps") },
   { name: "Aperturas con mancuerna", targets: t1("Pecho") },
+  { name: "Flexiones (push-ups)", targets: t2("Pecho", "Deltoides Anterior") },
   // Hombro (deltoide anterior, lateral y posterior)
-  { name: "Press militar", targets: t2("Hombro", "Tríceps") }, // anterior
-  { name: "Elevaciones laterales", targets: t1("Hombro") }, // lateral
-  { name: "Pájaros (deltoide posterior)", targets: t1("Hombro") }, // posterior
-  { name: "Face pull", targets: t2("Hombro", "Espalda Alta/Trapecios") }, // posterior
+  { name: "Press militar", targets: t3("Deltoides Anterior", "Deltoides Lateral", "Tríceps") },
+  { name: "Elevaciones laterales", targets: t1("Deltoides Lateral") },
+  { name: "Pájaros (deltoide posterior)", targets: t1("Deltoides Posterior") },
+  { name: "Face pull", targets: t2("Deltoides Posterior", "Espalda Alta/Trapecios") },
+  { name: "Remo abierto (codos afuera)", targets: t2("Espalda Alta/Trapecios", "Deltoides Posterior") },
   // Bíceps
   { name: "Curl de bíceps con barra", targets: t1("Bíceps") },
   { name: "Curl martillo", targets: t1("Bíceps") },
@@ -172,7 +174,7 @@ const DEFAULT_EXERCISE_CATALOG = [
 const MUSCLE_GROUPS = [
   "Cuádriceps", "Isquiotibiales/Femoral", "Glúteos", "Aductores/Abductores", "Gemelos/Pantorrillas",
   "Dorsales", "Espalda Alta/Trapecios", "Espalda Baja/Lumbares",
-  "Pecho", "Hombro", "Bíceps", "Tríceps", "Abdomen",
+  "Pecho", "Deltoides Anterior", "Deltoides Lateral", "Deltoides Posterior", "Bíceps", "Tríceps", "Abdomen",
 ];
 
 /** Filtro rápido de ejercicios: categorías amplias -> subgrupos musculares reales que agrupan. */
@@ -180,7 +182,7 @@ const MUSCLE_FILTER_GROUPS = {
   "Pecho": ["Pecho"],
   "Espalda": ["Dorsales", "Espalda Alta/Trapecios", "Espalda Baja/Lumbares"],
   "Pierna": ["Cuádriceps", "Isquiotibiales/Femoral", "Glúteos", "Aductores/Abductores", "Gemelos/Pantorrillas"],
-  "Hombro": ["Hombro"],
+  "Hombro": ["Deltoides Anterior", "Deltoides Lateral", "Deltoides Posterior"],
   "Brazo": ["Bíceps", "Tríceps"],
   "Core": ["Abdomen"],
 };
@@ -466,12 +468,17 @@ function shrinkPoly(points, factor = 0.5) {
 const zone = (group, parts) => ({ group, parts });
 const mirror = (points) => points.trim().split(" ").map((p) => { const [x, y] = p.split(","); return `${(160 - Number(x)).toFixed(1)},${y}`; }).join(" ");
 
-const DELTOID_L = "18,42 34,38 42,52 36,66 22,64 14,54";
+// El deltoide se divide en 2 mitades del mismo polígono original: la medial (cercana al cuello/torso)
+// se usa como Anterior en la vista frontal y Posterior en la de espalda; la lateral (hacia el brazo)
+// es el mismo grupo "Deltoides Lateral" en ambas vistas, ya que el haz lateral se ve desde los dos lados.
+const DELTOID_MEDIAL_L = "18,42 26,39 29,65 22,64 14,54";
+const DELTOID_LATERAL_L = "26,39 34,38 42,52 36,66 29,65";
 const ARM_BACK_L = "22,72 36,74 40,96 34,120 20,118 16,94";
 const ARM_FRONT_L = "24,72 36,74 38,96 32,118 22,116 18,94";
 
 const FRONT_ZONES = [
-  zone("Hombro", [{ d: DELTOID_L, lx: 12, ly: 40 }, { d: mirror(DELTOID_L), lx: 148, ly: 40 }]),
+  zone("Deltoides Anterior", [{ d: DELTOID_MEDIAL_L, lx: 8, ly: 44 }, { d: mirror(DELTOID_MEDIAL_L), lx: 152, ly: 44 }]),
+  zone("Deltoides Lateral", [{ d: DELTOID_LATERAL_L, lx: 48, ly: 58 }, { d: mirror(DELTOID_LATERAL_L), lx: 112, ly: 58 }]),
   zone("Pecho", [
     { d: "80,54 66,58 58,72 64,86 80,82", lx: 58, ly: 68 },
     { d: mirror("80,54 66,58 58,72 64,86 80,82"), lx: 102, ly: 68 },
@@ -486,7 +493,8 @@ const FRONT_ZONES = [
 ];
 
 const BACK_ZONES = [
-  zone("Hombro", [{ d: DELTOID_L, lx: 12, ly: 40 }, { d: mirror(DELTOID_L), lx: 148, ly: 40 }]),
+  zone("Deltoides Posterior", [{ d: DELTOID_MEDIAL_L, lx: 8, ly: 44 }, { d: mirror(DELTOID_MEDIAL_L), lx: 152, ly: 44 }]),
+  zone("Deltoides Lateral", [{ d: DELTOID_LATERAL_L, lx: 48, ly: 58 }, { d: mirror(DELTOID_LATERAL_L), lx: 112, ly: 58 }]),
   zone("Espalda Alta/Trapecios", [{ d: "80,40 100,46 92,80 68,80 60,46", lx: 80, ly: 52 }]),
   zone("Dorsales", [
     { d: "58,58 76,62 70,120 52,140 44,90", lx: 40, ly: 105 },
@@ -1018,7 +1026,16 @@ export default function NutriDash() {
   const [proteinPerKg, setProteinPerKg] = useState(stored.proteinPerKg ?? 2.0);
   const [fatPercent, setFatPercent] = useState(stored.fatPercent ?? 25);
 
-  const [foods, setFoods] = useState(() => (stored.foods ?? FOOD_DB_INITIAL).map((f) => ({ ...f, category: foodCategory(f) })));
+  const [foods, setFoods] = useState(() => (stored.foods ?? FOOD_DB_INITIAL).map((f) => {
+    const base = FOOD_DB_INITIAL.find((d) => d.id === f.id); // valores de referencia si es uno de los precargados
+    return {
+      ...f,
+      category: foodCategory(f),
+      fiber: f.fiber ?? base?.fiber ?? 0,
+      sodium: f.sodium ?? base?.sodium ?? 0,
+      sugar: f.sugar ?? base?.sugar ?? 0,
+    };
+  }));
   const [mealTemplates, setMealTemplates] = useState(stored.mealTemplates ?? []); // {id, name, items}
   const [editGramsItem, setEditGramsItem] = useState(null); // {mealId, itemId}
   const [editGramsDraft, setEditGramsDraft] = useState("");
