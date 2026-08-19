@@ -1491,11 +1491,26 @@ export default function NutriDash() {
     if (!editingFood || !editFoodDraft) return;
     const d = editFoodDraft;
     if (!d.name.trim() || [d.kcal, d.p, d.c, d.f, d.fiber].some((v) => v === "" || isNaN(Number(v)) || Number(v) < 0)) return;
-    setFoods((prev) => prev.map((f) => (f.id === editingFood.id ? {
-      ...f, name: d.name.trim(), kcal: Number(d.kcal), p: Number(d.p), c: Number(d.c), f: Number(d.f),
+    const updated = {
+      name: d.name.trim(), kcal: Number(d.kcal), p: Number(d.p), c: Number(d.c), f: Number(d.f),
       fiber: Number(d.fiber), sodium: Number(d.sodium) || 0, sugar: Number(d.sugar) || 0, category: d.category,
-    } : f)));
-    toast(`"${d.name.trim()}" actualizado`);
+    };
+    setFoods((prev) => prev.map((f) => (f.id === editingFood.id ? { ...f, ...updated } : f)));
+
+    // Sincroniza las instancias de este alimento ya agregadas HOY (se identifican por nombre, ya que los ítems no guardan el id del alimento), recalculando según los gramos que cada una ya tenía.
+    setMeals((prev) => prev.map((m) => ({
+      ...m,
+      items: m.items.map((it) => {
+        if (it.name !== editingFood.name) return it;
+        const factor = it.grams / 100;
+        return {
+          ...it, name: updated.name, kcal: updated.kcal * factor, p: updated.p * factor, c: updated.c * factor, f: updated.f * factor,
+          fiber: updated.fiber * factor, sodium: (updated.sodium || 0) * factor, sugar: (updated.sugar || 0) * factor,
+        };
+      }),
+    })));
+
+    toast(`"${updated.name}" actualizado y sincronizado con hoy`);
     setEditingFood(null);
     setEditFoodDraft(null);
   }
