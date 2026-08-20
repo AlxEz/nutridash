@@ -1095,6 +1095,10 @@ export default function NutriDash() {
   const [editGramsItem, setEditGramsItem] = useState(null); // {mealId, itemId}
   const [editGramsDraft, setEditGramsDraft] = useState("");
 
+  const [eqCategory, setEqCategory] = useState("proteina");
+  const [eqOriginId, setEqOriginId] = useState(null);
+  const [eqOriginGrams, setEqOriginGrams] = useState(100);
+  const [eqDestId, setEqDestId] = useState(null);
   const [simBaseFoodId, setSimBaseFoodId] = useState(null);
   const [simBaseGrams, setSimBaseGrams] = useState("100");
   const [simCalorieFilter, setSimCalorieFilter] = useState(false);
@@ -1450,7 +1454,7 @@ export default function NutriDash() {
   // Al cambiar qué alimentos están elegidos para reemplazar la comida, sugiere gramos nuevos solo para los recién agregados (respeta lo que el usuario ya haya ajustado a mano).
   useEffect(() => {
     if (mealReplaceSelectedIds.length === 0) return;
-    const meal = meals.find((m) => m.id === mealReplaceMealId);
+    const meal = meals.find((m) => m.id === mealReplaceMealId) ?? meals[0] ?? null;
     if (!meal) return;
     const targetTotals = meal.items.reduce((a, it) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, c: a.c + it.c, f: a.f + it.f }), { kcal: 0, p: 0, c: 0, f: 0 });
     const selectedFoods = foods.filter((f) => mealReplaceSelectedIds.includes(f.id));
@@ -1460,7 +1464,7 @@ export default function NutriDash() {
       selectedFoods.forEach((f) => { next[f.id] = prev[f.id] ?? suggested[f.id] ?? "100"; });
       return next;
     });
-  }, [mealReplaceSelectedIds, mealReplaceMealId]);
+  }, [mealReplaceSelectedIds, mealReplaceMealId, meals]);
 
   function handleImageSelect(e) {
     const file = e.target.files?.[0];
@@ -2518,6 +2522,89 @@ export default function NutriDash() {
               </div>
             </Panel>
           )}
+
+          {/* -------- Calculadora de equivalencias -------- */}
+          {(() => {
+            const eqFoods = foods.filter((f) => foodCategory(f) === eqCategory);
+            const originFood = eqFoods.find((f) => f.id === eqOriginId) ?? eqFoods[0] ?? null;
+            const destFood = eqFoods.find((f) => f.id === eqDestId) ?? eqFoods.find((f) => f.id !== originFood?.id) ?? eqFoods[0] ?? null;
+            const result = calcEquivalence(originFood, Number(eqOriginGrams), destFood, eqCategory);
+            return (
+              <Panel>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Calculadora de equivalencias
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+                  Cuántos gramos de un alimento necesitas para igualar el macro principal de otro.
+                </div>
+
+                <Field label="Categoría a comparar">
+                  <ToggleGroup options={MACRO_CATEGORIES} value={eqCategory} onChange={(v) => { setEqCategory(v); setEqOriginId(null); setEqDestId(null); }} />
+                </Field>
+
+                {eqFoods.length < 2 ? (
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Necesitas al menos 2 alimentos en esta categoría para comparar.</div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 4 }}>
+                      <Field label="Origen">
+                        <select style={selectStyle} value={originFood?.id} onChange={(e) => setEqOriginId(e.target.value)}>
+                          {eqFoods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Gramos">
+                        <input type="number" style={{ ...inputStyle, width: 72 }} value={eqOriginGrams} onChange={(e) => setEqOriginGrams(e.target.value)} />
+                      </Field>
+                    </div>
+                    <Field label="Reemplazar por (destino)">
+                      <select style={selectStyle} value={destFood?.id} onChange={(e) => setEqDestId(e.target.value)}>
+                        {eqFoods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    </Field>
+
+                    {result && (
+                      <div style={{ marginTop: 6, padding: 14, borderRadius: 10, background: "var(--panel2)", border: `1px solid ${MACRO_CATEGORIES.find((c) => c.value === eqCategory).color}44` }}>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Necesitas</div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 700, color: MACRO_CATEGORIES.find((c) => c.value === eqCategory).color, marginBottom: 12 }}>
+                          {round(result.destGrams)} g de {destFood.name}
+                        </div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ color: "var(--text-dim)", textAlign: "right" }}>
+                              <th style={{ textAlign: "left", fontWeight: 500, paddingBottom: 6 }}></th>
+                              <th style={{ fontWeight: 500, paddingBottom: 6 }}>Kcal</th>
+                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--protein)" }}>P</th>
+                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--carbs)" }}>C</th>
+                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--fat)" }}>G</th>
+                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--accent2)" }}>F</th>
+                            </tr>
+                          </thead>
+                          <tbody style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                            <tr style={{ borderTop: "1px solid var(--border)" }}>
+                              <td style={{ padding: "6px 0", color: "var(--text-dim)" }}>{originFood.name} ({round(eqOriginGrams)}g)</td>
+                              <td style={{ textAlign: "right" }}>{round(result.origin.kcal)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.origin.p)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.origin.c)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.origin.f)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.origin.fiber || 0)}</td>
+                            </tr>
+                            <tr style={{ borderTop: "1px solid var(--border)" }}>
+                              <td style={{ padding: "6px 0", color: "var(--text-dim)" }}>{destFood.name} ({round(result.destGrams)}g)</td>
+                              <td style={{ textAlign: "right" }}>{round(result.dest.kcal)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.dest.p)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.dest.c)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.dest.f)}</td>
+                              <td style={{ textAlign: "right" }}>{round(result.dest.fiber || 0)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Panel>
+            );
+          })()}
 
           {/* -------- Buscador de Equivalentes -------- */}
           {(() => {
