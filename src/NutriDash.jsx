@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell, Leaf,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell, Leaf, Sparkles,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -68,6 +68,92 @@ function calcEquivalence(originFood, originGrams, destFood, category) {
   const originMacroAmount = originFood[key] * (originGrams / 100);
   const destGrams = (originMacroAmount / destFood[key]) * 100;
   return { key, destGrams, origin: scaleFood(originFood, originGrams), dest: scaleFood(destFood, destGrams) };
+}
+
+/**
+ * Buscador de equivalentes por perfil de macros (todos los valores por 100g).
+ * 1) Normaliza P/C/F por min-max sobre el conjunto considerado, para que ningún macro pese más solo por tener números más grandes.
+ * 2) Distancia euclidiana: d = sqrt((P1-P2)² + (C1-C2)² + (F1-F2)²) en el espacio normalizado (cada eje en [0,1]).
+ * 3) Filtro opcional de calorías: descarta candidatos que no estén dentro de ±25% de las kcal/100g del alimento base.
+ * Devuelve el Top 5 más cercano, con un % de similitud (100% = distancia 0, 0% = la distancia máxima posible en el cubo unitario, sqrt(3)).
+ */
+function findSimilarFoods(baseFood, allFoods, filterByCalories) {
+  if (!baseFood) return [];
+  const candidates = allFoods.filter((f) => f.id !== baseFood.id);
+  const pool = filterByCalories
+    ? candidates.filter((f) => Math.abs(f.kcal - baseFood.kcal) <= baseFood.kcal * 0.25)
+    : candidates;
+  if (pool.length === 0) return [];
+
+  const set = [baseFood, ...pool];
+  const rangeOf = (key) => {
+    const vals = set.map((f) => f[key]);
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+  };
+  const rp = rangeOf("p"), rc = rangeOf("c"), rf = rangeOf("f");
+  const norm = (f, r, key) => (r.max === r.min ? 0 : (f[key] - r.min) / (r.max - r.min));
+  const vec = (f) => ({ p: norm(f, rp, "p"), c: norm(f, rc, "c"), f: norm(f, rf, "f") });
+
+  const baseVec = vec(baseFood);
+  return pool
+    .map((f) => {
+      const v = vec(f);
+      const distance = Math.sqrt((baseVec.p - v.p) ** 2 + (baseVec.c - v.c) ** 2 + (baseVec.f - v.f) ** 2);
+      const similarity = Math.max(0, Math.round((1 - distance / Math.sqrt(3)) * 100));
+      return { food: f, distance, similarity };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 5);
+}
+
+const MACRO_LABEL = { p: "Proteína", c: "Carbohidratos", f: "Grasas" };
+const MACRO_COLOR_VAR = { p: "var(--protein)", c: "var(--carbs)", f: "var(--fat)" };
+const DEFICIT_THRESHOLD = 0.85; // por debajo del 85% del objetivo de esa comida cuenta como déficit
+
+/** Motor de análisis: compara los totales de una comida contra su objetivo y devuelve los macros por debajo del umbral, el más faltante primero. */
+function analyzeMealDeficits(mealTotals, mealTarget) {
+  return ["p", "c", "f"]
+    .filter((key) => mealTarget[key] > 0 && mealTotals[key] < mealTarget[key] * DEFICIT_THRESHOLD)
+    .map((key) => ({ key, have: mealTotals[key], target: mealTarget[key], missing: mealTarget[key] - mealTotals[key] }))
+    .sort((a, b) => b.missing - a.missing);
+}
+
+/** Recomendación por densidad: gramos de ese macro por kcal (más alto = más "denso" en el nutriente que falta), Top 5. */
+/**
+ * Recomendación por densidad (gramos del macro faltante por kcal), Top 5. Para cada candidato calcula
+ * la cantidad sugerida para cerrar TODO el faltante de ese macro (con un tope de 200g, una porción razonable),
+ * proyecta cómo quedaría la comida completa con esa cantidad agregada, y dice si con eso basta o si
+ * todavía haría falta otro alimento para los macros que sigan por debajo del umbral.
+ */
+function recommendFoodsForMacro(macroKey, foods, mealTotals, mealTarget, missingAmount) {
+  return foods
+    .filter((f) => f.kcal > 0 && f[macroKey] > 0)
+    .map((f) => ({ food: f, density: f[macroKey] / f.kcal }))
+    .sort((a, b) => b.density - a.density)
+    .slice(0, 5)
+    .map(({ food }) => {
+      const idealGrams = (missingAmount / food[macroKey]) * 100;
+      const suggestedGrams = Math.round(Math.min(idealGrams, 200));
+      const factor = suggestedGrams / 100;
+      const projected = { kcal: mealTotals.kcal + food.kcal * factor, p: mealTotals.p + food.p * factor, c: mealTotals.c + food.c * factor, f: mealTotals.f + food.f * factor };
+      const stillMissing = analyzeMealDeficits(projected, mealTarget);
+      return { food, suggestedGrams, stillMissing };
+    });
+}
+
+/** Sustitución: a los mismos gramos del alimento original, busca candidatos con kcal similar (±20%) que aporten MÁS del macro que falta. Top 3. */
+function findSubstituteForItem(item, macroKey, foods) {
+  const factor = item.grams / 100;
+  return foods
+    .filter((f) => f.name !== item.name)
+    .map((f) => {
+      const kcal = f.kcal * factor;
+      const macroAmount = f[macroKey] * factor;
+      return { food: f, kcal, macroAmount, kcalDiffPct: item.kcal > 0 ? Math.abs(kcal - item.kcal) / item.kcal : 0 };
+    })
+    .filter((s) => s.kcalDiffPct <= 0.2 && s.macroAmount > (item[macroKey] || 0))
+    .sort((a, b) => b.macroAmount - a.macroAmount)
+    .slice(0, 3);
 }
 
 const round = (n, d = 0) => {
@@ -1044,6 +1130,11 @@ export default function NutriDash() {
   const [eqOriginId, setEqOriginId] = useState(null);
   const [eqOriginGrams, setEqOriginGrams] = useState(100);
   const [eqDestId, setEqDestId] = useState(null);
+  const [simBaseFoodId, setSimBaseFoodId] = useState(null);
+  const [simCalorieFilter, setSimCalorieFilter] = useState(false);
+  const [optimizerMealId, setOptimizerMealId] = useState(null);
+  const [optimizerReplaceItemId, setOptimizerReplaceItemId] = useState(null);
+  const [optimizerReplaceKey, setOptimizerReplaceKey] = useState(null);
   const [saveTemplateMealId, setSaveTemplateMealId] = useState(null);
   const [templateNameDraft, setTemplateNameDraft] = useState("");
   const [templatePickerMealId, setTemplatePickerMealId] = useState(null);
@@ -1348,7 +1439,8 @@ export default function NutriDash() {
     setShowCustomForm(false);
     setCustomError("");
   }
-  function addFoodFromPicker(food, gramsOverride) {
+  function addFoodFromPicker(food, gramsOverride, mealIdOverride) {
+    const targetMealId = mealIdOverride ?? pickerMeal;
     const grams = gramsOverride ?? pickerGrams[food.id] ?? 100;
     if (!grams || grams <= 0) return;
     const factor = grams / 100;
@@ -1357,12 +1449,25 @@ export default function NutriDash() {
       fiber: (food.fiber || 0) * factor, sodium: (food.sodium || 0) * factor, sugar: (food.sugar || 0) * factor,
       icon: food.icon, image: food.image,
     };
-    setMeals((prev) => prev.map((m) => (m.id === pickerMeal ? { ...m, items: [...m.items, item] } : m)));
+    setMeals((prev) => prev.map((m) => (m.id === targetMealId ? { ...m, items: [...m.items, item] } : m)));
     setRecentFoodIds((prev) => [food.id, ...prev.filter((id) => id !== food.id)].slice(0, 8));
     setPickerMeal(null);
     setPickerSearch("");
     setPickerGrams({});
     toast(`"${food.name}" agregado correctamente`);
+  }
+
+  /** Sustituye un ítem ya agregado por otro alimento, a los mismos gramos (algoritmo de sustitución del optimizador). */
+  function replaceItemInMeal(mealId, oldItemId, newFood, grams) {
+    const factor = grams / 100;
+    const newItem = {
+      id: uid(), name: newFood.name, grams, kcal: newFood.kcal * factor, p: newFood.p * factor, c: newFood.c * factor, f: newFood.f * factor,
+      fiber: (newFood.fiber || 0) * factor, sodium: (newFood.sodium || 0) * factor, sugar: (newFood.sugar || 0) * factor,
+      icon: newFood.icon, image: newFood.image,
+    };
+    setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, items: m.items.map((it) => (it.id === oldItemId ? newItem : it)) } : m)));
+    setOptimizerReplaceItemId(null);
+    toast(`Reemplazado por "${newFood.name}"`);
   }
   function handleImageSelect(e) {
     const file = e.target.files?.[0];
@@ -2494,6 +2599,206 @@ export default function NutriDash() {
                           </tbody>
                         </table>
                       </div>
+                    )}
+                  </>
+                )}
+              </Panel>
+            );
+          })()}
+
+          {/* -------- Buscador de Equivalentes (Similarity Engine) -------- */}
+          {(() => {
+            const baseFood = foods.find((f) => f.id === simBaseFoodId) ?? foods[0] ?? null;
+            const results = baseFood ? findSimilarFoods(baseFood, foods, simCalorieFilter) : [];
+            return (
+              <Panel>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                  Buscador de equivalentes
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+                  Encuentra los 5 alimentos con el perfil de macros más parecido al que elijas. La comparación siempre es <strong style={{ color: "var(--text)" }}>por cada 100g</strong> de cada alimento (distancia euclidiana normalizada de P/C/G).
+                </div>
+
+                <Field label="Alimento base">
+                  <select style={selectStyle} value={baseFood?.id ?? ""} onChange={(e) => setSimBaseFoodId(e.target.value)}>
+                    {foods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </Field>
+
+                {baseFood && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, marginBottom: 12, padding: "8px 10px", borderRadius: 8, background: "var(--panel2)", border: "1px solid var(--border)" }}>
+                    <span style={{ color: "var(--text-dim)" }}>por 100g:</span>
+                    <span style={{ color: "var(--text)" }}>{round(baseFood.kcal)} kcal</span>
+                    <span style={{ color: "var(--protein)" }}>P {round(baseFood.p)}g</span>
+                    <span style={{ color: "var(--carbs)" }}>C {round(baseFood.c)}g</span>
+                    <span style={{ color: "var(--fat)" }}>G {round(baseFood.f)}g</span>
+                    <span style={{ color: "var(--accent2)" }}>F {round(baseFood.fiber || 0)}g</span>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setSimCalorieFilter((v) => !v)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "4px 0 12px", cursor: "pointer", color: "var(--text)" }}
+                >
+                  {simCalorieFilter ? <CheckCircle2 size={16} color="var(--accent2)" /> : <Circle size={16} color="var(--text-dim)" />}
+                  <span style={{ fontSize: 12 }}>Filtrar por calorías similares (±25%)</span>
+                </button>
+
+                {results.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+                    {simCalorieFilter ? "Ningún alimento cae dentro del rango de calorías. Prueba sin el filtro." : "Necesitas al menos 2 alimentos en tu lista para comparar."}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Top 5 más parecidos (por 100g)</div>
+                    {results.map(({ food, similarity }) => (
+                      <div key={food.id} style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, flexShrink: 0, color: "var(--accent2)", background: "var(--accent2)1A", border: "1px solid var(--accent2)55" }}>
+                            {similarity}% parecido
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--text-dim)" }}>
+                          <span style={{ color: "var(--text-dim)", fontSize: 9.5 }}>/100g</span>
+                          <span style={{ color: "var(--text)" }}>{round(food.kcal)} kcal</span>
+                          <span style={{ color: "var(--protein)" }}>P {round(food.p)}g</span>
+                          <span style={{ color: "var(--carbs)" }}>C {round(food.c)}g</span>
+                          <span style={{ color: "var(--fat)" }}>G {round(food.f)}g</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            );
+          })()}
+
+          {/* -------- Optimizador de Comidas -------- */}
+          {(() => {
+            const meal = meals.find((m) => m.id === optimizerMealId) ?? meals[0] ?? null;
+            if (!meal) return null;
+            const mealTotals = meal.items.reduce((a, it) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, c: a.c + it.c, f: a.f + it.f }), { kcal: 0, p: 0, c: 0, f: 0 });
+            const mealTarget = { kcal: targetCalories / mealCount, p: targetProtein / mealCount, c: targetCarbs / mealCount, f: targetFat / mealCount };
+            const deficits = analyzeMealDeficits(mealTotals, mealTarget);
+            const topDeficit = deficits[0] ?? null;
+            const recommendations = topDeficit ? recommendFoodsForMacro(topDeficit.key, foods, mealTotals, mealTarget, topDeficit.missing) : [];
+            const replaceItem = meal.items.find((it) => it.id === optimizerReplaceItemId) ?? null;
+            const substitutes = replaceItem && optimizerReplaceKey ? findSubstituteForItem(replaceItem, optimizerReplaceKey, foods) : [];
+
+            return (
+              <Panel>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, display: "flex", alignItems: "center", gap: 7 }}>
+                  <Sparkles size={15} color="var(--success)" /> Optimizador de comidas
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+                  Analiza una comida contra su objetivo, te dice qué macro te falta y te recomienda o sustituye alimentos para cubrirlo.
+                </div>
+
+                <Field label="Comida a analizar">
+                  <select style={selectStyle} value={meal.id} onChange={(e) => { setOptimizerMealId(e.target.value); setOptimizerReplaceItemId(null); setOptimizerReplaceKey(null); }}>
+                    {meals.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </Field>
+
+                {meal.items.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Esta comida todavía no tiene alimentos agregados.</div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Totales vs. objetivo de esta comida</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                      {[{ key: "kcal", label: "Kcal", color: "var(--accent)" }, { key: "p", label: "P", color: "var(--protein)" }, { key: "c", label: "C", color: "var(--carbs)" }, { key: "f", label: "G", color: "var(--fat)" }].map((m2) => (
+                        <div key={m2.key} style={{ textAlign: "center", padding: "8px 4px", borderRadius: 8, background: "var(--panel2)", border: "1px solid var(--border)" }}>
+                          <div style={{ fontSize: 9.5, color: "var(--text-dim)", marginBottom: 2 }}>{m2.label}</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, fontWeight: 700, color: m2.color }}>{round(mealTotals[m2.key])}</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, color: "var(--text-dim)" }}>/ {round(mealTarget[m2.key])}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {deficits.length === 0 ? (
+                      <div style={{ fontSize: 12.5, color: "var(--success)", display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                        <CheckCircle2 size={16} /> Esta comida ya cubre bien sus macros — nada que optimizar.
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Déficit detectado</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                          {deficits.map((d) => (
+                            <span key={d.key} style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 10px", borderRadius: 20, color: MACRO_COLOR_VAR[d.key], background: `${MACRO_COLOR_VAR[d.key]}1A`, border: `1px solid ${MACRO_COLOR_VAR[d.key]}55` }}>
+                              Faltan {round(d.missing)}g de {MACRO_LABEL[d.key]}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+                          Alimentos recomendados (altos en {MACRO_LABEL[topDeficit.key].toLowerCase()})
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                          {recommendations.length === 0 ? (
+                            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>No hay alimentos en tu lista con ese perfil todavía.</div>
+                          ) : recommendations.map(({ food, suggestedGrams, stillMissing }) => (
+                            <div key={food.id} style={{ padding: "9px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: MACRO_COLOR_VAR[topDeficit.key] }}>{round(food[topDeficit.key])}g {MACRO_LABEL[topDeficit.key]} /100g</div>
+                                </div>
+                                <button onClick={() => addFoodFromPicker(food, suggestedGrams, meal.id)} style={{ background: "var(--accent)", border: "none", borderRadius: 7, padding: "6px 10px", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 11.5, flexShrink: 0 }}>
+                                  <Plus size={13} /> {suggestedGrams}g
+                                </button>
+                              </div>
+                              {stillMissing.length === 0 ? (
+                                <div style={{ fontSize: 11, color: "var(--success)", display: "flex", alignItems: "center", gap: 5 }}>
+                                  <CheckCircle2 size={12} /> Con {suggestedGrams}g cubres el objetivo completo, no necesitas agregar nada más.
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: 11, color: "var(--fat)" }}>
+                                  Con {suggestedGrams}g cubres {MACRO_LABEL[topDeficit.key].toLowerCase()}, pero seguirías necesitando otro alimento para: {stillMissing.map((d) => `${round(d.missing)}g de ${MACRO_LABEL[d.key].toLowerCase()}`).join(", ")}.
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Buscar reemplazo para un alimento ya agregado</div>
+                    <Field label="Alimento a reemplazar">
+                      <select style={selectStyle} value={optimizerReplaceItemId ?? ""} onChange={(e) => { setOptimizerReplaceItemId(e.target.value); setOptimizerReplaceKey(topDeficit?.key ?? "p"); }}>
+                        <option value="">Elige uno...</option>
+                        {meal.items.map((it) => <option key={it.id} value={it.id}>{it.name} ({round(it.grams)}g)</option>)}
+                      </select>
+                    </Field>
+                    {replaceItem && (
+                      <>
+                        <Field label="Mejorar">
+                          <ToggleGroup
+                            options={[{ value: "p", label: "Proteína" }, { value: "c", label: "Carbos" }, { value: "f", label: "Grasa" }]}
+                            value={optimizerReplaceKey}
+                            onChange={setOptimizerReplaceKey}
+                          />
+                        </Field>
+                        {substitutes.length === 0 ? (
+                          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>No encontramos un sustituto con kcal similar (±20%) que aporte más {MACRO_LABEL[optimizerReplaceKey].toLowerCase()}.</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {substitutes.map(({ food, kcal, macroAmount }) => (
+                              <div key={food.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: "var(--text-dim)" }}>
+                                    {round(kcal)} kcal · <span style={{ color: MACRO_COLOR_VAR[optimizerReplaceKey] }}>{round(macroAmount)}g {MACRO_LABEL[optimizerReplaceKey]}</span> a los mismos {round(replaceItem.grams)}g
+                                  </div>
+                                </div>
+                                <button onClick={() => replaceItemInMeal(meal.id, replaceItem.id, food, replaceItem.grams)} style={{ background: "var(--success)", border: "none", borderRadius: 7, padding: "6px 10px", cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 11.5, flexShrink: 0 }}>
+                                  Reemplazar
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}
