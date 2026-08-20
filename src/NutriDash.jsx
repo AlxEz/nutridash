@@ -44,7 +44,7 @@ const FIBER_TARGET = 30; // g/día — recomendación general (no personalizada 
 /** Escala un alimento (valores por 100g) a una cantidad en gramos. */
 function scaleFood(food, grams) {
   const factor = grams / 100;
-  return { kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor };
+  return { kcal: food.kcal * factor, p: food.p * factor, c: food.c * factor, f: food.f * factor, fiber: (food.fiber || 0) * factor };
 }
 
 /** Infiere la categoría por macro dominante (kcal aportadas): respaldo para alimentos guardados sin `category`. */
@@ -106,54 +106,23 @@ function findSimilarFoods(baseFood, allFoods, filterByCalories) {
     .slice(0, 5);
 }
 
-const MACRO_LABEL = { p: "Proteína", c: "Carbohidratos", f: "Grasas" };
-const MACRO_COLOR_VAR = { p: "var(--protein)", c: "var(--carbs)", f: "var(--fat)" };
-const DEFICIT_THRESHOLD = 0.85; // por debajo del 85% del objetivo de esa comida cuenta como déficit
-
-/** Motor de análisis: compara los totales de una comida contra su objetivo y devuelve los macros por debajo del umbral, el más faltante primero. */
-function analyzeMealDeficits(mealTotals, mealTarget) {
-  return ["p", "c", "f"]
-    .filter((key) => mealTarget[key] > 0 && mealTotals[key] < mealTarget[key] * DEFICIT_THRESHOLD)
-    .map((key) => ({ key, have: mealTotals[key], target: mealTarget[key], missing: mealTarget[key] - mealTotals[key] }))
-    .sort((a, b) => b.missing - a.missing);
-}
-
-/** Recomendación por densidad: gramos de ese macro por kcal (más alto = más "denso" en el nutriente que falta), Top 5. */
 /**
- * Recomendación por densidad (gramos del macro faltante por kcal), Top 5. Para cada candidato calcula
- * la cantidad sugerida para cerrar TODO el faltante de ese macro (con un tope de 200g, una porción razonable),
- * proyecta cómo quedaría la comida completa con esa cantidad agregada, y dice si con eso basta o si
- * todavía haría falta otro alimento para los macros que sigan por debajo del umbral.
+ * Optimizador de comidas: dado el total de macros de la comida que se quiere reemplazar y un conjunto de
+ * alimentos elegidos por el usuario, sugiere cuántos gramos de cada uno usar para acercarse a ese total.
+ * Agrupa los alimentos elegidos por su categoría dominante (proteína/carbohidrato/grasa) y reparte el
+ * objetivo de esa categoría entre los alimentos que la cubren. El usuario puede editar cada gramaje después.
  */
-function recommendFoodsForMacro(macroKey, foods, mealTotals, mealTarget, missingAmount) {
-  return foods
-    .filter((f) => f.kcal > 0 && f[macroKey] > 0)
-    .map((f) => ({ food: f, density: f[macroKey] / f.kcal }))
-    .sort((a, b) => b.density - a.density)
-    .slice(0, 5)
-    .map(({ food }) => {
-      const idealGrams = (missingAmount / food[macroKey]) * 100;
-      const suggestedGrams = Math.round(Math.min(idealGrams, 200));
-      const factor = suggestedGrams / 100;
-      const projected = { kcal: mealTotals.kcal + food.kcal * factor, p: mealTotals.p + food.p * factor, c: mealTotals.c + food.c * factor, f: mealTotals.f + food.f * factor };
-      const stillMissing = analyzeMealDeficits(projected, mealTarget);
-      return { food, suggestedGrams, stillMissing };
-    });
-}
-
-/** Sustitución: a los mismos gramos del alimento original, busca candidatos con kcal similar (±20%) que aporten MÁS del macro que falta. Top 3. */
-function findSubstituteForItem(item, macroKey, foods) {
-  const factor = item.grams / 100;
-  return foods
-    .filter((f) => f.name !== item.name)
-    .map((f) => {
-      const kcal = f.kcal * factor;
-      const macroAmount = f[macroKey] * factor;
-      return { food: f, kcal, macroAmount, kcalDiffPct: item.kcal > 0 ? Math.abs(kcal - item.kcal) / item.kcal : 0 };
-    })
-    .filter((s) => s.kcalDiffPct <= 0.2 && s.macroAmount > (item[macroKey] || 0))
-    .sort((a, b) => b.macroAmount - a.macroAmount)
-    .slice(0, 3);
+function suggestReplacementGrams(targetTotals, selectedFoods) {
+  const grouped = { proteina: [], carbohidrato: [], grasa: [] };
+  selectedFoods.forEach((f) => grouped[foodCategory(f)].push(f));
+  const grams = {};
+  MACRO_CATEGORIES.forEach(({ value, key }) => {
+    const group = grouped[value];
+    if (group.length === 0) return;
+    const targetForCategory = (targetTotals[key] || 0) / group.length;
+    group.forEach((f) => { grams[f.id] = f[key] > 0 ? String(round((targetForCategory / f[key]) * 100)) : "100"; });
+  });
+  return grams;
 }
 
 const round = (n, d = 0) => {
@@ -1126,15 +1095,13 @@ export default function NutriDash() {
   const [editGramsItem, setEditGramsItem] = useState(null); // {mealId, itemId}
   const [editGramsDraft, setEditGramsDraft] = useState("");
 
-  const [eqCategory, setEqCategory] = useState("proteina");
-  const [eqOriginId, setEqOriginId] = useState(null);
-  const [eqOriginGrams, setEqOriginGrams] = useState(100);
-  const [eqDestId, setEqDestId] = useState(null);
   const [simBaseFoodId, setSimBaseFoodId] = useState(null);
+  const [simBaseGrams, setSimBaseGrams] = useState("100");
   const [simCalorieFilter, setSimCalorieFilter] = useState(false);
-  const [optimizerMealId, setOptimizerMealId] = useState(null);
-  const [optimizerReplaceItemId, setOptimizerReplaceItemId] = useState(null);
-  const [optimizerReplaceKey, setOptimizerReplaceKey] = useState(null);
+  const [mealReplaceMealId, setMealReplaceMealId] = useState(null);
+  const [mealReplaceSelectedIds, setMealReplaceSelectedIds] = useState([]);
+  const [mealReplaceGrams, setMealReplaceGrams] = useState({}); // {foodId: "gramos" editable por el usuario}
+  const [mealReplaceSearch, setMealReplaceSearch] = useState("");
   const [saveTemplateMealId, setSaveTemplateMealId] = useState(null);
   const [templateNameDraft, setTemplateNameDraft] = useState("");
   const [templatePickerMealId, setTemplatePickerMealId] = useState(null);
@@ -1458,17 +1425,43 @@ export default function NutriDash() {
   }
 
   /** Sustituye un ítem ya agregado por otro alimento, a los mismos gramos (algoritmo de sustitución del optimizador). */
-  function replaceItemInMeal(mealId, oldItemId, newFood, grams) {
-    const factor = grams / 100;
-    const newItem = {
-      id: uid(), name: newFood.name, grams, kcal: newFood.kcal * factor, p: newFood.p * factor, c: newFood.c * factor, f: newFood.f * factor,
-      fiber: (newFood.fiber || 0) * factor, sodium: (newFood.sodium || 0) * factor, sugar: (newFood.sugar || 0) * factor,
-      icon: newFood.icon, image: newFood.image,
-    };
-    setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, items: m.items.map((it) => (it.id === oldItemId ? newItem : it)) } : m)));
-    setOptimizerReplaceItemId(null);
-    toast(`Reemplazado por "${newFood.name}"`);
+  function toggleMealReplaceFood(foodId) {
+    setMealReplaceSelectedIds((prev) => (prev.includes(foodId) ? prev.filter((id) => id !== foodId) : [...prev, foodId]));
   }
+
+  /** Sustituye TODOS los alimentos de una comida por los elegidos, a los gramos (ya ajustados o no) que tenga cada uno en ese momento. */
+  function applyMealReplacement(mealId, selectedFoods, gramsMap) {
+    const items = selectedFoods.map((f) => {
+      const grams = Number(gramsMap[f.id]) || 0;
+      const factor = grams / 100;
+      return {
+        id: uid(), name: f.name, grams, kcal: f.kcal * factor, p: f.p * factor, c: f.c * factor, f: f.f * factor,
+        fiber: (f.fiber || 0) * factor, sodium: (f.sodium || 0) * factor, sugar: (f.sugar || 0) * factor,
+        icon: f.icon, image: f.image,
+      };
+    });
+    setMeals((prev) => prev.map((m) => (m.id === mealId ? { ...m, items, completed: false } : m)));
+    setMealReplaceSelectedIds([]);
+    setMealReplaceGrams({});
+    setMealReplaceSearch("");
+    toast("Comida reemplazada correctamente");
+  }
+
+  // Al cambiar qué alimentos están elegidos para reemplazar la comida, sugiere gramos nuevos solo para los recién agregados (respeta lo que el usuario ya haya ajustado a mano).
+  useEffect(() => {
+    if (mealReplaceSelectedIds.length === 0) return;
+    const meal = meals.find((m) => m.id === mealReplaceMealId);
+    if (!meal) return;
+    const targetTotals = meal.items.reduce((a, it) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, c: a.c + it.c, f: a.f + it.f }), { kcal: 0, p: 0, c: 0, f: 0 });
+    const selectedFoods = foods.filter((f) => mealReplaceSelectedIds.includes(f.id));
+    const suggested = suggestReplacementGrams(targetTotals, selectedFoods);
+    setMealReplaceGrams((prev) => {
+      const next = {};
+      selectedFoods.forEach((f) => { next[f.id] = prev[f.id] ?? suggested[f.id] ?? "100"; });
+      return next;
+    });
+  }, [mealReplaceSelectedIds, mealReplaceMealId]);
+
   function handleImageSelect(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2526,89 +2519,13 @@ export default function NutriDash() {
             </Panel>
           )}
 
-          {/* -------- Calculadora de equivalencias -------- */}
-          {(() => {
-            const eqFoods = foods.filter((f) => foodCategory(f) === eqCategory);
-            const originFood = eqFoods.find((f) => f.id === eqOriginId) ?? eqFoods[0] ?? null;
-            const destFood = eqFoods.find((f) => f.id === eqDestId) ?? eqFoods.find((f) => f.id !== originFood?.id) ?? eqFoods[0] ?? null;
-            const result = calcEquivalence(originFood, Number(eqOriginGrams), destFood, eqCategory);
-            return (
-              <Panel>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
-                  Calculadora de equivalencias
-                </div>
-                <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
-                  Cuántos gramos de un alimento necesitas para igualar el macro principal de otro.
-                </div>
-
-                <Field label="Categoría a comparar">
-                  <ToggleGroup options={MACRO_CATEGORIES} value={eqCategory} onChange={(v) => { setEqCategory(v); setEqOriginId(null); setEqDestId(null); }} />
-                </Field>
-
-                {eqFoods.length < 2 ? (
-                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Necesitas al menos 2 alimentos en esta categoría para comparar.</div>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 4 }}>
-                      <Field label="Origen">
-                        <select style={selectStyle} value={originFood?.id} onChange={(e) => setEqOriginId(e.target.value)}>
-                          {eqFoods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Gramos">
-                        <input type="number" style={{ ...inputStyle, width: 72 }} value={eqOriginGrams} onChange={(e) => setEqOriginGrams(e.target.value)} />
-                      </Field>
-                    </div>
-                    <Field label="Reemplazar por (destino)">
-                      <select style={selectStyle} value={destFood?.id} onChange={(e) => setEqDestId(e.target.value)}>
-                        {eqFoods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                      </select>
-                    </Field>
-
-                    {result && (
-                      <div style={{ marginTop: 6, padding: 14, borderRadius: 10, background: "var(--panel2)", border: `1px solid ${MACRO_CATEGORIES.find((c) => c.value === eqCategory).color}44` }}>
-                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Necesitas</div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 700, color: MACRO_CATEGORIES.find((c) => c.value === eqCategory).color, marginBottom: 12 }}>
-                          {round(result.destGrams)} g de {destFood.name}
-                        </div>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                          <thead>
-                            <tr style={{ color: "var(--text-dim)", textAlign: "right" }}>
-                              <th style={{ textAlign: "left", fontWeight: 500, paddingBottom: 6 }}></th>
-                              <th style={{ fontWeight: 500, paddingBottom: 6 }}>Kcal</th>
-                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--protein)" }}>P</th>
-                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--carbs)" }}>C</th>
-                              <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--fat)" }}>G</th>
-                            </tr>
-                          </thead>
-                          <tbody style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                            <tr style={{ borderTop: "1px solid var(--border)" }}>
-                              <td style={{ padding: "6px 0", color: "var(--text-dim)" }}>{originFood.name} ({round(eqOriginGrams)}g)</td>
-                              <td style={{ textAlign: "right" }}>{round(result.origin.kcal)}</td>
-                              <td style={{ textAlign: "right" }}>{round(result.origin.p)}</td>
-                              <td style={{ textAlign: "right" }}>{round(result.origin.c)}</td>
-                              <td style={{ textAlign: "right" }}>{round(result.origin.f)}</td>
-                            </tr>
-                            <tr style={{ borderTop: "1px solid var(--border)" }}>
-                              <td style={{ padding: "6px 0", color: "var(--text-dim)" }}>{destFood.name} ({round(result.destGrams)}g)</td>
-                              <td style={{ textAlign: "right" }}>{round(result.dest.kcal)}</td>
-                              <td style={{ textAlign: "right" }}>{round(result.dest.p)}</td>
-                              <td style={{ textAlign: "right" }}>{round(result.dest.c)}</td>
-                              <td style={{ textAlign: "right" }}>{round(result.dest.f)}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )}
-              </Panel>
-            );
-          })()}
-
-          {/* -------- Buscador de Equivalentes (Similarity Engine) -------- */}
+          {/* -------- Buscador de Equivalentes -------- */}
           {(() => {
             const baseFood = foods.find((f) => f.id === simBaseFoodId) ?? foods[0] ?? null;
+            const baseGrams = Number(simBaseGrams) || 0;
+            const baseCategory = baseFood ? foodCategory(baseFood) : "proteina";
+            const baseCategoryMeta = MACRO_CATEGORIES.find((c) => c.value === baseCategory);
+            const baseAtGrams = baseFood && baseGrams > 0 ? scaleFood(baseFood, baseGrams) : null;
             const results = baseFood ? findSimilarFoods(baseFood, foods, simCalorieFilter) : [];
             return (
               <Panel>
@@ -2616,23 +2533,28 @@ export default function NutriDash() {
                   Buscador de equivalentes
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
-                  Encuentra los 5 alimentos con el perfil de macros más parecido al que elijas. La comparación siempre es <strong style={{ color: "var(--text)" }}>por cada 100g</strong> de cada alimento (distancia euclidiana normalizada de P/C/G).
+                  Elige qué alimento y cuántos gramos quieres reemplazar. Te mostramos los 5 alimentos con perfil de macros más parecido (comparado por cada 100g, sin importar el gramaje que elijas) y cuántos gramos de cada uno necesitas para igualar los mismos macros de tu porción.
                 </div>
 
-                <Field label="Alimento base">
-                  <select style={selectStyle} value={baseFood?.id ?? ""} onChange={(e) => setSimBaseFoodId(e.target.value)}>
-                    {foods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                </Field>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 12 }}>
+                  <Field label="Alimento a reemplazar">
+                    <select style={selectStyle} value={baseFood?.id ?? ""} onChange={(e) => setSimBaseFoodId(e.target.value)}>
+                      {foods.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Gramos">
+                    <input type="number" style={{ ...inputStyle, width: 72 }} value={simBaseGrams} onChange={(e) => setSimBaseGrams(e.target.value)} />
+                  </Field>
+                </div>
 
-                {baseFood && (
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, marginBottom: 12, padding: "8px 10px", borderRadius: 8, background: "var(--panel2)", border: "1px solid var(--border)" }}>
-                    <span style={{ color: "var(--text-dim)" }}>por 100g:</span>
-                    <span style={{ color: "var(--text)" }}>{round(baseFood.kcal)} kcal</span>
-                    <span style={{ color: "var(--protein)" }}>P {round(baseFood.p)}g</span>
-                    <span style={{ color: "var(--carbs)" }}>C {round(baseFood.c)}g</span>
-                    <span style={{ color: "var(--fat)" }}>G {round(baseFood.f)}g</span>
-                    <span style={{ color: "var(--accent2)" }}>F {round(baseFood.fiber || 0)}g</span>
+                {baseAtGrams && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, marginBottom: 12, padding: "8px 10px", borderRadius: 8, background: "var(--panel2)", border: `1px solid ${baseCategoryMeta.color}44` }}>
+                    <span style={{ color: "var(--text-dim)" }}>{round(baseGrams)}g de {baseFood.name}:</span>
+                    <span style={{ color: "var(--text)" }}>{round(baseAtGrams.kcal)} kcal</span>
+                    <span style={{ color: "var(--protein)" }}>P {round(baseAtGrams.p)}g</span>
+                    <span style={{ color: "var(--carbs)" }}>C {round(baseAtGrams.c)}g</span>
+                    <span style={{ color: "var(--fat)" }}>G {round(baseAtGrams.f)}g</span>
+                    <span style={{ color: "var(--accent2)" }}>F {round(baseAtGrams.fiber || 0)}g</span>
                   </div>
                 )}
 
@@ -2650,41 +2572,54 @@ export default function NutriDash() {
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Top 5 más parecidos (por 100g)</div>
-                    {results.map(({ food, similarity }) => (
-                      <div key={food.id} style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, flexShrink: 0, color: "var(--accent2)", background: "var(--accent2)1A", border: "1px solid var(--accent2)55" }}>
-                            {similarity}% parecido
-                          </span>
+                    <div style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Top 5 más parecidos</div>
+                    {results.map(({ food, similarity }) => {
+                      const eq = baseAtGrams ? calcEquivalence(baseFood, baseGrams, food, baseCategory) : null;
+                      return (
+                        <div key={food.id} style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
+                            <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, flexShrink: 0, color: "var(--accent2)", background: "var(--accent2)1A", border: "1px solid var(--accent2)55" }}>
+                              {similarity}% parecido
+                            </span>
+                          </div>
+                          {eq ? (
+                            <>
+                              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, fontWeight: 700, color: baseCategoryMeta.color, marginBottom: 4 }}>
+                                {round(eq.destGrams)} g
+                              </div>
+                              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--text-dim)" }}>
+                                <span style={{ color: "var(--text)" }}>{round(eq.dest.kcal)} kcal</span>
+                                <span style={{ color: "var(--protein)" }}>P {round(eq.dest.p)}g</span>
+                                <span style={{ color: "var(--carbs)" }}>C {round(eq.dest.c)}g</span>
+                                <span style={{ color: "var(--fat)" }}>G {round(eq.dest.f)}g</span>
+                                <span style={{ color: "var(--accent2)" }}>F {round(eq.dest.fiber || 0)}g</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>Este alimento no tiene suficiente {baseCategoryMeta.label.toLowerCase()} para igualar la porción — no se puede calcular un gramaje equivalente.</div>
+                          )}
                         </div>
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--text-dim)" }}>
-                          <span style={{ color: "var(--text-dim)", fontSize: 9.5 }}>/100g</span>
-                          <span style={{ color: "var(--text)" }}>{round(food.kcal)} kcal</span>
-                          <span style={{ color: "var(--protein)" }}>P {round(food.p)}g</span>
-                          <span style={{ color: "var(--carbs)" }}>C {round(food.c)}g</span>
-                          <span style={{ color: "var(--fat)" }}>G {round(food.f)}g</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </Panel>
             );
           })()}
 
-          {/* -------- Optimizador de Comidas -------- */}
+          {/* -------- Optimizador de Comidas (reemplazo completo) -------- */}
           {(() => {
-            const meal = meals.find((m) => m.id === optimizerMealId) ?? meals[0] ?? null;
+            const meal = meals.find((m) => m.id === mealReplaceMealId) ?? meals[0] ?? null;
             if (!meal) return null;
-            const mealTotals = meal.items.reduce((a, it) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, c: a.c + it.c, f: a.f + it.f }), { kcal: 0, p: 0, c: 0, f: 0 });
-            const mealTarget = { kcal: targetCalories / mealCount, p: targetProtein / mealCount, c: targetCarbs / mealCount, f: targetFat / mealCount };
-            const deficits = analyzeMealDeficits(mealTotals, mealTarget);
-            const topDeficit = deficits[0] ?? null;
-            const recommendations = topDeficit ? recommendFoodsForMacro(topDeficit.key, foods, mealTotals, mealTarget, topDeficit.missing) : [];
-            const replaceItem = meal.items.find((it) => it.id === optimizerReplaceItemId) ?? null;
-            const substitutes = replaceItem && optimizerReplaceKey ? findSubstituteForItem(replaceItem, optimizerReplaceKey, foods) : [];
+            const targetTotals = meal.items.reduce((a, it) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, c: a.c + it.c, f: a.f + it.f, fiber: a.fiber + (it.fiber || 0) }), { kcal: 0, p: 0, c: 0, f: 0, fiber: 0 });
+            const selectedFoods = foods.filter((f) => mealReplaceSelectedIds.includes(f.id));
+            const newTotals = selectedFoods.reduce((a, f) => {
+              const grams = Number(mealReplaceGrams[f.id]) || 0;
+              const factor = grams / 100;
+              return { kcal: a.kcal + f.kcal * factor, p: a.p + f.p * factor, c: a.c + f.c * factor, f: a.f + f.f * factor, fiber: a.fiber + (f.fiber || 0) * factor };
+            }, { kcal: 0, p: 0, c: 0, f: 0, fiber: 0 });
+            const pickFoods = foods.filter((f) => f.name.toLowerCase().includes(mealReplaceSearch.toLowerCase()));
 
             return (
               <Panel>
@@ -2692,112 +2627,80 @@ export default function NutriDash() {
                   <Sparkles size={15} color="var(--success)" /> Optimizador de comidas
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
-                  Analiza una comida contra su objetivo, te dice qué macro te falta y te recomienda o sustituye alimentos para cubrirlo.
+                  Reemplaza una comida completa por otros alimentos. Elige con cuáles quieres sustituirla y calculamos los gramos para acercarnos a sus mismos macros — tú puedes editarlos después.
                 </div>
 
-                <Field label="Comida a analizar">
-                  <select style={selectStyle} value={meal.id} onChange={(e) => { setOptimizerMealId(e.target.value); setOptimizerReplaceItemId(null); setOptimizerReplaceKey(null); }}>
+                <Field label="Comida a reemplazar">
+                  <select style={selectStyle} value={meal.id} onChange={(e) => { setMealReplaceMealId(e.target.value); setMealReplaceSelectedIds([]); setMealReplaceGrams({}); }}>
                     {meals.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </Field>
 
                 {meal.items.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Esta comida todavía no tiene alimentos agregados.</div>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Esta comida todavía no tiene alimentos — no hay macros que igualar.</div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Totales vs. objetivo de esta comida</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
-                      {[{ key: "kcal", label: "Kcal", color: "var(--accent)" }, { key: "p", label: "P", color: "var(--protein)" }, { key: "c", label: "C", color: "var(--carbs)" }, { key: "f", label: "G", color: "var(--fat)" }].map((m2) => (
-                        <div key={m2.key} style={{ textAlign: "center", padding: "8px 4px", borderRadius: 8, background: "var(--panel2)", border: "1px solid var(--border)" }}>
-                          <div style={{ fontSize: 9.5, color: "var(--text-dim)", marginBottom: 2 }}>{m2.label}</div>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, fontWeight: 700, color: m2.color }}>{round(mealTotals[m2.key])}</div>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, color: "var(--text-dim)" }}>/ {round(mealTarget[m2.key])}</div>
-                        </div>
-                      ))}
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Meta a igualar (lo que tiene ahora)</div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, marginBottom: 14, padding: "8px 10px", borderRadius: 8, background: "var(--panel2)", border: "1px solid var(--border)" }}>
+                      <span style={{ color: "var(--text)" }}>{round(targetTotals.kcal)} kcal</span>
+                      <span style={{ color: "var(--protein)" }}>P {round(targetTotals.p)}g</span>
+                      <span style={{ color: "var(--carbs)" }}>C {round(targetTotals.c)}g</span>
+                      <span style={{ color: "var(--fat)" }}>G {round(targetTotals.f)}g</span>
+                      <span style={{ color: "var(--accent2)" }}>F {round(targetTotals.fiber)}g</span>
                     </div>
 
-                    {deficits.length === 0 ? (
-                      <div style={{ fontSize: 12.5, color: "var(--success)", display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                        <CheckCircle2 size={16} /> Esta comida ya cubre bien sus macros — nada que optimizar.
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Déficit detectado</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-                          {deficits.map((d) => (
-                            <span key={d.key} style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 10px", borderRadius: 20, color: MACRO_COLOR_VAR[d.key], background: `${MACRO_COLOR_VAR[d.key]}1A`, border: `1px solid ${MACRO_COLOR_VAR[d.key]}55` }}>
-                              Faltan {round(d.missing)}g de {MACRO_LABEL[d.key]}
-                            </span>
-                          ))}
-                        </div>
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Elige los alimentos de reemplazo</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 10 }}>
+                      <Search size={15} color="var(--text-dim)" />
+                      <input value={mealReplaceSearch} onChange={(e) => setMealReplaceSearch(e.target.value)} placeholder="Buscar alimento..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: "32vh", overflowY: "auto", marginBottom: 14 }}>
+                      {pickFoods.map((f) => {
+                        const checked = mealReplaceSelectedIds.includes(f.id);
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => toggleMealReplaceFood(f.id)}
+                            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 10px", borderRadius: 8, border: `1px solid ${checked ? "var(--accent2)" : "var(--border)"}`, background: checked ? "var(--accent2)1A" : "var(--panel2)", cursor: "pointer", color: "var(--text)" }}
+                          >
+                            {checked ? <CheckCircle2 size={15} color="var(--accent2)" /> : <Circle size={15} color="var(--text-dim)" />}
+                            <span style={{ fontSize: 12.5, textAlign: "left", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-                          Alimentos recomendados (altos en {MACRO_LABEL[topDeficit.key].toLowerCase()})
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-                          {recommendations.length === 0 ? (
-                            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>No hay alimentos en tu lista con ese perfil todavía.</div>
-                          ) : recommendations.map(({ food, suggestedGrams, stillMissing }) => (
-                            <div key={food.id} style={{ padding: "9px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
-                                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: MACRO_COLOR_VAR[topDeficit.key] }}>{round(food[topDeficit.key])}g {MACRO_LABEL[topDeficit.key]} /100g</div>
-                                </div>
-                                <button onClick={() => addFoodFromPicker(food, suggestedGrams, meal.id)} style={{ background: "var(--accent)", border: "none", borderRadius: 7, padding: "6px 10px", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 11.5, flexShrink: 0 }}>
-                                  <Plus size={13} /> {suggestedGrams}g
-                                </button>
-                              </div>
-                              {stillMissing.length === 0 ? (
-                                <div style={{ fontSize: 11, color: "var(--success)", display: "flex", alignItems: "center", gap: 5 }}>
-                                  <CheckCircle2 size={12} /> Con {suggestedGrams}g cubres el objetivo completo, no necesitas agregar nada más.
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: 11, color: "var(--fat)" }}>
-                                  Con {suggestedGrams}g cubres {MACRO_LABEL[topDeficit.key].toLowerCase()}, pero seguirías necesitando otro alimento para: {stillMissing.map((d) => `${round(d.missing)}g de ${MACRO_LABEL[d.key].toLowerCase()}`).join(", ")}.
-                                </div>
-                              )}
+                    {selectedFoods.length > 0 && (
+                      <>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Gramos sugeridos (edítalos si quieres)</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                          {selectedFoods.map((f) => (
+                            <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)" }}>
+                              <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</div>
+                              <input
+                                type="number"
+                                value={mealReplaceGrams[f.id] ?? ""}
+                                onChange={(e) => setMealReplaceGrams((prev) => ({ ...prev, [f.id]: e.target.value }))}
+                                style={{ ...inputStyle, width: 64, padding: "5px 7px", fontSize: 12, flexShrink: 0 }}
+                              />
+                              <span style={{ fontSize: 11, color: "var(--text-dim)", flexShrink: 0 }}>g</span>
+                              <button onClick={() => toggleMealReplaceFood(f.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: 2, flexShrink: 0 }}><X size={14} /></button>
                             </div>
                           ))}
                         </div>
-                      </>
-                    )}
 
-                    <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Buscar reemplazo para un alimento ya agregado</div>
-                    <Field label="Alimento a reemplazar">
-                      <select style={selectStyle} value={optimizerReplaceItemId ?? ""} onChange={(e) => { setOptimizerReplaceItemId(e.target.value); setOptimizerReplaceKey(topDeficit?.key ?? "p"); }}>
-                        <option value="">Elige uno...</option>
-                        {meal.items.map((it) => <option key={it.id} value={it.id}>{it.name} ({round(it.grams)}g)</option>)}
-                      </select>
-                    </Field>
-                    {replaceItem && (
-                      <>
-                        <Field label="Mejorar">
-                          <ToggleGroup
-                            options={[{ value: "p", label: "Proteína" }, { value: "c", label: "Carbos" }, { value: "f", label: "Grasa" }]}
-                            value={optimizerReplaceKey}
-                            onChange={setOptimizerReplaceKey}
-                          />
-                        </Field>
-                        {substitutes.length === 0 ? (
-                          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>No encontramos un sustituto con kcal similar (±20%) que aporte más {MACRO_LABEL[optimizerReplaceKey].toLowerCase()}.</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {substitutes.map(({ food, kcal, macroAmount }) => (
-                              <div key={food.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)" }}>
-                                <div style={{ minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{food.name}</div>
-                                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: "var(--text-dim)" }}>
-                                    {round(kcal)} kcal · <span style={{ color: MACRO_COLOR_VAR[optimizerReplaceKey] }}>{round(macroAmount)}g {MACRO_LABEL[optimizerReplaceKey]}</span> a los mismos {round(replaceItem.grams)}g
-                                  </div>
-                                </div>
-                                <button onClick={() => replaceItemInMeal(meal.id, replaceItem.id, food, replaceItem.grams)} style={{ background: "var(--success)", border: "none", borderRadius: 7, padding: "6px 10px", cursor: "pointer", color: "#07060B", fontWeight: 700, fontSize: 11.5, flexShrink: 0 }}>
-                                  Reemplazar
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Cómo queda vs. la meta</div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, marginBottom: 16, padding: "8px 10px", borderRadius: 8, background: "var(--panel2)", border: "1px solid var(--border)" }}>
+                          <span style={{ color: "var(--text)" }}>{round(newTotals.kcal)} <span style={{ color: "var(--text-dim)" }}>/ {round(targetTotals.kcal)} kcal</span></span>
+                          <span style={{ color: "var(--protein)" }}>P {round(newTotals.p)}<span style={{ color: "var(--text-dim)" }}>/{round(targetTotals.p)}g</span></span>
+                          <span style={{ color: "var(--carbs)" }}>C {round(newTotals.c)}<span style={{ color: "var(--text-dim)" }}>/{round(targetTotals.c)}g</span></span>
+                          <span style={{ color: "var(--fat)" }}>G {round(newTotals.f)}<span style={{ color: "var(--text-dim)" }}>/{round(targetTotals.f)}g</span></span>
+                          <span style={{ color: "var(--accent2)" }}>F {round(newTotals.fiber)}<span style={{ color: "var(--text-dim)" }}>/{round(targetTotals.fiber)}g</span></span>
+                        </div>
+
+                        <button onClick={() => applyMealReplacement(meal.id, selectedFoods, mealReplaceGrams)} style={primaryButtonStyle}>
+                          <Sparkles size={16} /> Reemplazar comida
+                        </button>
                       </>
                     )}
                   </>
