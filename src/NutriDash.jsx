@@ -202,11 +202,14 @@ const DEFAULT_EXERCISE_CATALOG = [
   { name: "Press inclinado", targets: t3("Pecho", "Deltoides Anterior", "Tríceps") },
   { name: "Press declinado", targets: t2("Pecho", "Tríceps") },
   { name: "Aperturas con mancuerna", targets: t1("Pecho") },
+  { name: "Aperturas en máquina (Pec Deck)", targets: t1("Pecho") },
   { name: "Flexiones (push-ups)", targets: t2("Pecho", "Deltoides Anterior") },
   // Hombro (deltoide anterior, lateral y posterior)
   { name: "Press militar", targets: t3("Deltoides Anterior", "Deltoides Lateral", "Tríceps") },
   { name: "Elevaciones laterales", targets: t1("Deltoides Lateral") },
+  { name: "Elevaciones frontales", targets: t1("Deltoides Anterior") },
   { name: "Pájaros (deltoide posterior)", targets: t1("Deltoides Posterior") },
+  { name: "Pec Deck Inverso (deltoide posterior en máquina)", targets: t1("Deltoides Posterior") },
   { name: "Face pull", targets: t2("Deltoides Posterior", "Espalda Alta/Trapecios") },
   { name: "Remo abierto (codos afuera)", targets: t2("Espalda Alta/Trapecios", "Deltoides Posterior") },
   // Bíceps
@@ -1768,8 +1771,9 @@ export default function NutriDash() {
   function getWeeksForBlock(blockId) {
     return weeks.filter((w) => w.blockId === blockId).sort((a, b) => a.order - b.order);
   }
+  /** Los días siempre se muestran ordenados por fecha (no por el orden en que se crearon/editaron). Si dos caen el mismo día, se desempata por su orden de creación. */
   function getDaysForWeek(weekId) {
-    return days.filter((d) => d.weekId === weekId).sort((a, b) => a.order - b.order);
+    return days.filter((d) => d.weekId === weekId).sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
   }
   function getExercisesForDay(dayId) {
     return dayExercises.filter((e) => e.dayId === dayId).sort((a, b) => a.order - b.order);
@@ -1784,28 +1788,44 @@ export default function NutriDash() {
     return recSets.length ? recSets : null;
   }
 
-  /** Suma series efectivas por grupo muscular: primario = 1.0, secundario = 0.5 por serie. */
-  function getMuscleVolumeForDays(dayIds) {
-    const volume = {};
+  /** Desglose por grupo muscular: series directas (músculo primario, x1.0), indirectas (secundario, x0.5) y su suma. */
+  function getMuscleVolumeBreakdownForDays(dayIds) {
+    const breakdown = {};
     dayIds.forEach((dayId) => {
       getExercisesForDay(dayId).forEach((ex) => {
         const catalogEx = catalog.find((c) => c.id === ex.catalogExerciseId);
         if (!catalogEx?.targets) return;
         const setCount = getSetsForExercise(ex.id).length;
         catalogEx.targets.forEach(({ group, role }) => {
-          const weight = role === "primary" ? 1 : SECONDARY_SET_WEIGHT;
-          volume[group] = (volume[group] || 0) + setCount * weight;
+          if (!breakdown[group]) breakdown[group] = { direct: 0, indirect: 0 };
+          if (role === "primary") breakdown[group].direct += setCount;
+          else breakdown[group].indirect += setCount * SECONDARY_SET_WEIGHT;
         });
       });
     });
+    return breakdown;
+  }
+
+  /** Suma series efectivas por grupo muscular: primario = 1.0, secundario = 0.5 por serie. */
+  function getMuscleVolumeForDays(dayIds) {
+    const breakdown = getMuscleVolumeBreakdownForDays(dayIds);
+    const volume = {};
+    Object.entries(breakdown).forEach(([group, { direct, indirect }]) => { volume[group] = direct + indirect; });
     return volume;
   }
   function getMuscleVolumeForWeek(weekId) {
     return getMuscleVolumeForDays(getDaysForWeek(weekId).map((d) => d.id));
   }
+  function getMuscleVolumeBreakdownForWeek(weekId) {
+    return getMuscleVolumeBreakdownForDays(getDaysForWeek(weekId).map((d) => d.id));
+  }
   function getMuscleVolumeForBlock(blockId) {
     const dayIds = getWeeksForBlock(blockId).flatMap((w) => getDaysForWeek(w.id).map((d) => d.id));
     return getMuscleVolumeForDays(dayIds);
+  }
+  function getMuscleVolumeBreakdownForBlock(blockId) {
+    const dayIds = getWeeksForBlock(blockId).flatMap((w) => getDaysForWeek(w.id).map((d) => d.id));
+    return getMuscleVolumeBreakdownForDays(dayIds);
   }
 
   /** Día de hoy si tiene rutina, si no el próximo día futuro con rutina (de cualquier bloque). */
@@ -1982,7 +2002,11 @@ export default function NutriDash() {
 
   function addExerciseFromPicker(catalogEx) {
     const variantName = (variantDrafts[catalogEx.id] ?? catalogEx.name).trim() || catalogEx.name;
-    const order = getExercisesForDay(exercisePickerDayId).length;
+    const existing = getExercisesForDay(exercisePickerDayId);
+    // max(order existente)+1 en vez de .length: si el día viene de una semana copiada o tuvo ejercicios
+    // eliminados, puede haber huecos en el orden — usar .length chocaría con un order ya usado y
+    // dejaría el ejercicio nuevo "atorado" sin poder moverlo arriba de los que ya estaban.
+    const order = existing.length === 0 ? 0 : Math.max(...existing.map((e) => e.order)) + 1;
     const newEx = { id: uid(), dayId: exercisePickerDayId, catalogExerciseId: catalogEx.id, variantName, order, sourceDayExerciseId: null };
     setDayExercises((prev) => [...prev, newEx]);
     setExercisePickerDayId(null);
@@ -2943,6 +2967,12 @@ export default function NutriDash() {
                   const volumeMap = mapScope === "bloque"
                     ? getMuscleVolumeForBlock(block.id)
                     : (currentMapWeekId ? getMuscleVolumeForWeek(currentMapWeekId) : {});
+                  const volumeBreakdown = mapScope === "bloque"
+                    ? getMuscleVolumeBreakdownForBlock(block.id)
+                    : (currentMapWeekId ? getMuscleVolumeBreakdownForWeek(currentMapWeekId) : {});
+                  const breakdownRows = Object.entries(volumeBreakdown)
+                    .map(([group, { direct, indirect }]) => ({ group, direct, indirect, total: direct + indirect }))
+                    .sort((a, b) => b.total - a.total);
                   return (
                     <Panel>
                       <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
@@ -2961,9 +2991,37 @@ export default function NutriDash() {
                       ) : (
                         <>
                           <MuscleBodyMap volumeMap={volumeMap} />
-                          <div style={{ fontSize: 10.5, color: "var(--text-dim)", textAlign: "center", marginTop: 4 }}>
+                          <div style={{ fontSize: 10.5, color: "var(--text-dim)", textAlign: "center", marginTop: 4, marginBottom: 16 }}>
                             Series efectivas (primario=1, secundario=0.5) · más color y brillo = más volumen (≥{VOLUME_CAP} = intensidad máxima)
                           </div>
+
+                          <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>
+                            Volumen semanal detallado
+                          </div>
+                          {breakdownRows.length === 0 ? (
+                            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>Sin series registradas todavía en este alcance.</div>
+                          ) : (
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+                              <thead>
+                                <tr style={{ color: "var(--text-dim)", textAlign: "right" }}>
+                                  <th style={{ textAlign: "left", fontWeight: 500, paddingBottom: 6 }}>Grupo</th>
+                                  <th style={{ fontWeight: 500, paddingBottom: 6 }}>Directas</th>
+                                  <th style={{ fontWeight: 500, paddingBottom: 6 }}>Indirectas</th>
+                                  <th style={{ fontWeight: 500, paddingBottom: 6, color: "var(--text)" }}>Total</th>
+                                </tr>
+                              </thead>
+                              <tbody style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                                {breakdownRows.map((row) => (
+                                  <tr key={row.group} style={{ borderTop: "1px solid var(--border)" }}>
+                                    <td style={{ padding: "6px 0", fontFamily: "'Inter', sans-serif", color: "var(--text)" }}>{row.group}</td>
+                                    <td style={{ textAlign: "right", color: "var(--accent)" }}>{round(row.direct, 1)}</td>
+                                    <td style={{ textAlign: "right", color: "var(--accent2)" }}>{round(row.indirect, 1)}</td>
+                                    <td style={{ textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{round(row.total, 1)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
                         </>
                       )}
                     </Panel>
