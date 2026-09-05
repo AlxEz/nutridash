@@ -161,73 +161,82 @@ const t3 = (g1, g2, g3) => [{ group: g1, role: P }, { group: g2, role: S }, { gr
 
 const DEFAULT_EXERCISE_CATALOG = [
   // Cuádriceps
-  { name: "Sentadilla", targets: t2("Cuádriceps", "Glúteos") },
-  { name: "Prensa de piernas", targets: t2("Cuádriceps", "Glúteos") },
-  { name: "Extensión de cuádriceps", targets: t1("Cuádriceps") },
-  { name: "Sentadilla búlgara", targets: t2("Cuádriceps", "Glúteos") },
+  { id: "sentadilla", name: "Sentadilla", targets: t2("Cuádriceps", "Glúteos") },
+  { id: "prensa-de-piernas", name: "Prensa de piernas", targets: t2("Cuádriceps", "Glúteos") },
+  { id: "extension-de-cuadriceps", name: "Extensión de cuádriceps", targets: t1("Cuádriceps") },
+  { id: "sentadilla-bulgara", name: "Sentadilla búlgara", targets: t2("Cuádriceps", "Glúteos") },
   // Isquiotibiales / Femoral
-  { name: "Peso muerto rumano", targets: t3("Isquiotibiales/Femoral", "Glúteos", "Espalda Baja/Lumbares") },
-  { name: "Curl femoral", targets: t1("Isquiotibiales/Femoral") },
-  { name: "Peso muerto piernas rígidas", targets: t3("Isquiotibiales/Femoral", "Glúteos", "Espalda Baja/Lumbares") },
-  { name: "Curl nórdico", targets: t1("Isquiotibiales/Femoral") },
+  { id: "peso-muerto-rumano", name: "Peso muerto rumano", targets: t3("Isquiotibiales/Femoral", "Glúteos", "Espalda Baja/Lumbares") },
+  { id: "curl-femoral", name: "Curl femoral", targets: t1("Isquiotibiales/Femoral") },
+  { id: "peso-muerto-piernas-rigidas", name: "Peso muerto piernas rígidas", targets: t3("Isquiotibiales/Femoral", "Glúteos", "Espalda Baja/Lumbares") },
+  { id: "curl-nordico", name: "Curl nórdico", targets: t1("Isquiotibiales/Femoral") },
   // Glúteos
-  { name: "Hip thrust", targets: t2("Glúteos", "Isquiotibiales/Femoral") },
-  { name: "Elevación de cadera a una pierna", targets: t2("Glúteos", "Isquiotibiales/Femoral") },
-  { name: "Patada de glúteo en polea", targets: t1("Glúteos") },
-  { name: "Puente de glúteo", targets: t1("Glúteos") },
+  { id: "hip-thrust", name: "Hip thrust", targets: t2("Glúteos", "Isquiotibiales/Femoral") },
+  { id: "elevacion-de-cadera-a-una-pierna", name: "Elevación de cadera a una pierna", targets: t2("Glúteos", "Isquiotibiales/Femoral") },
+  { id: "patada-de-gluteo-en-polea", name: "Patada de glúteo en polea", targets: t1("Glúteos") },
+  { id: "puente-de-gluteo", name: "Puente de glúteo", targets: t1("Glúteos") },
   // Aductores / Abductores
-  { name: "Máquina de aductores", targets: t1("Aductores/Abductores") },
-  { name: "Máquina de abductores", targets: t1("Aductores/Abductores") },
-  { name: "Sentadilla sumo", targets: t3("Aductores/Abductores", "Cuádriceps", "Glúteos") },
+  { id: "maquina-de-aductores", name: "Máquina de aductores", targets: t1("Aductores/Abductores") },
+  { id: "maquina-de-abductores", name: "Máquina de abductores", targets: t1("Aductores/Abductores") },
+  { id: "sentadilla-sumo", name: "Sentadilla sumo", targets: t3("Aductores/Abductores", "Cuádriceps", "Glúteos") },
   // Gemelos / Pantorrillas
-  { name: "Gemelos de pie", targets: t1("Gemelos/Pantorrillas") },
-  { name: "Gemelos sentado", targets: t1("Gemelos/Pantorrillas") },
-  { name: "Elevación de talones en prensa", targets: t1("Gemelos/Pantorrillas") },
+  { id: "gemelos-de-pie", name: "Gemelos de pie", targets: t1("Gemelos/Pantorrillas") },
+  { id: "gemelos-sentado", name: "Gemelos sentado", targets: t1("Gemelos/Pantorrillas") },
+  { id: "elevacion-de-talones-en-prensa", name: "Elevación de talones en prensa", targets: t1("Gemelos/Pantorrillas") },
   // Dorsales
-  { name: "Dominadas", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
-  { name: "Jalón al pecho", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
-  { name: "Remo con barra", targets: t2("Dorsales", "Espalda Alta/Trapecios") },
-  { name: "Pullover", targets: t1("Dorsales") },
+  { id: "dominadas", name: "Dominadas", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
+  { id: "jalon-al-pecho", name: "Jalón al pecho", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
+  { id: "remo-con-barra", name: "Remo con barra", targets: t3("Dorsales", "Espalda Alta/Trapecios", "Bíceps") },
+  { id: "pullover", name: "Pullover", targets: t1("Dorsales") },
   // Espalda Alta / Trapecios
-  { name: "Encogimientos (shrugs)", targets: t1("Espalda Alta/Trapecios") },
-  { name: "Remo alto", targets: t2("Espalda Alta/Trapecios", "Deltoides Lateral") },
-  { name: "Remo Pendlay", targets: t2("Espalda Alta/Trapecios", "Dorsales") },
+  { id: "encogimientos-shrugs", name: "Encogimientos (shrugs)", targets: t1("Espalda Alta/Trapecios") },
+  { id: "remo-alto", name: "Remo alto", targets: t2("Espalda Alta/Trapecios", "Deltoides Lateral") },
+  { id: "remo-pendlay", name: "Remo Pendlay", targets: t3("Espalda Alta/Trapecios", "Dorsales", "Bíceps") },
   // Espalda Baja / Lumbares
-  { name: "Peso muerto convencional", targets: t3("Espalda Baja/Lumbares", "Isquiotibiales/Femoral", "Glúteos") },
-  { name: "Hiperextensión en banco romano", targets: t1("Espalda Baja/Lumbares") },
-  { name: "Superman", targets: t1("Espalda Baja/Lumbares") },
-  { name: "Buenos días", targets: t2("Espalda Baja/Lumbares", "Isquiotibiales/Femoral") },
+  { id: "peso-muerto-convencional", name: "Peso muerto convencional", targets: t3("Espalda Baja/Lumbares", "Isquiotibiales/Femoral", "Glúteos") },
+  { id: "hiperextension-en-banco-romano", name: "Hiperextensión en banco romano", targets: t1("Espalda Baja/Lumbares") },
+  { id: "superman", name: "Superman", targets: t1("Espalda Baja/Lumbares") },
+  { id: "buenos-dias", name: "Buenos días", targets: t2("Espalda Baja/Lumbares", "Isquiotibiales/Femoral") },
   // Pecho
-  { name: "Press de banca", targets: t3("Pecho", "Tríceps", "Deltoides Anterior") },
-  { name: "Press inclinado", targets: t3("Pecho", "Deltoides Anterior", "Tríceps") },
-  { name: "Press declinado", targets: t2("Pecho", "Tríceps") },
-  { name: "Aperturas con mancuerna", targets: t1("Pecho") },
-  { name: "Aperturas en máquina (Pec Deck)", targets: t1("Pecho") },
-  { name: "Flexiones (push-ups)", targets: t2("Pecho", "Deltoides Anterior") },
+  { id: "press-de-banca", name: "Press de banca", targets: t3("Pecho", "Tríceps", "Deltoides Anterior") },
+  { id: "press-inclinado", name: "Press inclinado", targets: t3("Pecho", "Deltoides Anterior", "Tríceps") },
+  { id: "press-declinado", name: "Press declinado", targets: t2("Pecho", "Tríceps") },
+  { id: "aperturas-con-mancuerna", name: "Aperturas con mancuerna", targets: t1("Pecho") },
+  { id: "aperturas-en-maquina-pec-deck", name: "Aperturas en máquina (Pec Deck)", targets: t1("Pecho") },
+  { id: "flexiones-push-ups", name: "Flexiones (push-ups)", targets: t2("Pecho", "Deltoides Anterior") },
   // Hombro (deltoide anterior, lateral y posterior)
-  { name: "Press militar", targets: t3("Deltoides Anterior", "Deltoides Lateral", "Tríceps") },
-  { name: "Elevaciones laterales", targets: t1("Deltoides Lateral") },
-  { name: "Elevaciones frontales", targets: t1("Deltoides Anterior") },
-  { name: "Pájaros (deltoide posterior)", targets: t1("Deltoides Posterior") },
-  { name: "Pec Deck Inverso (deltoide posterior en máquina)", targets: t1("Deltoides Posterior") },
-  { name: "Face pull", targets: t2("Deltoides Posterior", "Espalda Alta/Trapecios") },
-  { name: "Remo abierto (codos afuera)", targets: t2("Espalda Alta/Trapecios", "Deltoides Posterior") },
+  { id: "press-militar", name: "Press militar", targets: t3("Deltoides Anterior", "Deltoides Lateral", "Tríceps") },
+  { id: "elevaciones-laterales", name: "Elevaciones laterales", targets: t1("Deltoides Lateral") },
+  { id: "elevaciones-frontales", name: "Elevaciones frontales", targets: t1("Deltoides Anterior") },
+  { id: "pajaros-deltoide-posterior", name: "Pájaros (deltoide posterior)", targets: t1("Deltoides Posterior") },
+  { id: "pec-deck-inverso-deltoide-posterior-en-maquina", name: "Pec Deck Inverso (deltoide posterior en máquina)", targets: t1("Deltoides Posterior") },
+  { id: "face-pull", name: "Face pull", targets: t2("Deltoides Posterior", "Espalda Alta/Trapecios") },
+  { id: "remo-abierto-codos-afuera", name: "Remo abierto (codos afuera)", targets: t2("Espalda Alta/Trapecios", "Deltoides Posterior") },
   // Bíceps
-  { name: "Curl de bíceps con barra", targets: t1("Bíceps") },
-  { name: "Curl martillo", targets: t1("Bíceps") },
-  { name: "Curl concentrado", targets: t1("Bíceps") },
-  { name: "Curl inclinado con mancuerna", targets: t1("Bíceps") },
+  { id: "curl-de-biceps-con-barra", name: "Curl de bíceps con barra", targets: t1("Bíceps") },
+  { id: "curl-martillo", name: "Curl martillo", targets: t1("Bíceps") },
+  { id: "curl-concentrado", name: "Curl concentrado", targets: t1("Bíceps") },
+  { id: "curl-inclinado-con-mancuerna", name: "Curl inclinado con mancuerna", targets: t1("Bíceps") },
   // Tríceps
-  { name: "Extensión de tríceps en polea", targets: t1("Tríceps") },
-  { name: "Press francés", targets: t1("Tríceps") },
-  { name: "Fondos en banco", targets: t2("Tríceps", "Pecho") },
-  { name: "Patada de tríceps", targets: t1("Tríceps") },
+  { id: "extension-de-triceps-en-polea", name: "Extensión de tríceps en polea", targets: t1("Tríceps") },
+  { id: "press-frances", name: "Press francés", targets: t1("Tríceps") },
+  { id: "fondos-en-banco", name: "Fondos en banco", targets: t2("Tríceps", "Pecho") },
+  { id: "patada-de-triceps", name: "Patada de tríceps", targets: t1("Tríceps") },
   // Abdomen
-  { name: "Plancha", targets: t1("Abdomen") },
-  { name: "Abdominales", targets: t1("Abdomen") },
-  { name: "Elevación de piernas colgado", targets: t1("Abdomen") },
-  { name: "Rueda abdominal", targets: t1("Abdomen") },
-].map((e, i) => ({ id: `ex${i + 1}`, isCustom: false, ...e }));
+  { id: "plancha", name: "Plancha", targets: t1("Abdomen") },
+  { id: "abdominales", name: "Abdominales", targets: t1("Abdomen") },
+  { id: "elevacion-de-piernas-colgado", name: "Elevación de piernas colgado", targets: t1("Abdomen") },
+  { id: "rueda-abdominal", name: "Rueda abdominal", targets: t1("Abdomen") },
+].map((e) => ({ isCustom: false, ...e }));
+
+/**
+ * Migración única: hasta ahora el id de cada ejercicio precargado se generaba por su posición en el
+ * arreglo (`ex1`, `ex2`...), así que insertar uno nuevo en medio corría los ids de todos los siguientes
+ * y desconectaba los ejercicios que un usuario ya tenía guardados en sus días. Los ids ahora son fijos
+ * (por nombre) y ya no cambian nunca más. Esta tabla traduce, por posición, los ids viejos a los nuevos
+ * para no perder lo que ya estaba registrado.
+ */
+const OLD_EXERCISE_ID_MIGRATION = Object.fromEntries(DEFAULT_EXERCISE_CATALOG.map((e, i) => [`ex${i + 1}`, e.id]));
 
 const MUSCLE_GROUPS = [
   "Cuádriceps", "Isquiotibiales/Femoral", "Glúteos", "Aductores/Abductores", "Gemelos/Pantorrillas",
@@ -529,14 +538,16 @@ const mirror = (points) => points.trim().split(" ").map((p) => { const [x, y] = 
 // El deltoide se divide en 2 mitades del mismo polígono original: la medial (cercana al cuello/torso)
 // se usa como Anterior en la vista frontal y Posterior en la de espalda; la lateral (hacia el brazo)
 // es el mismo grupo "Deltoides Lateral" en ambas vistas, ya que el haz lateral se ve desde los dos lados.
-const DELTOID_MEDIAL_L = "18,42 26,39 29,65 22,64 14,54";
-const DELTOID_LATERAL_L = "26,39 34,38 42,52 36,66 29,65";
+// El torso empieza en x=45. La forma que llega hasta x=42 está pegada al torso (lado interno/medial);
+// la que llega hasta x=14 está lejos del torso, hacia el brazo (lado externo/lateral real).
+const DELTOID_INNER_L = "26,39 34,38 42,52 36,66 29,65"; // cerca del torso -> Anterior (frente) / Posterior (espalda)
+const DELTOID_OUTER_L = "18,42 26,39 29,65 22,64 14,54"; // lejos del torso, hacia el brazo -> Lateral (se ve en ambas vistas)
 const ARM_BACK_L = "22,72 36,74 40,96 34,120 20,118 16,94";
 const ARM_FRONT_L = "24,72 36,74 38,96 32,118 22,116 18,94";
 
 const FRONT_ZONES = [
-  zone("Deltoides Anterior", [{ d: DELTOID_MEDIAL_L, lx: 8, ly: 44 }, { d: mirror(DELTOID_MEDIAL_L), lx: 152, ly: 44 }]),
-  zone("Deltoides Lateral", [{ d: DELTOID_LATERAL_L, lx: 48, ly: 58 }, { d: mirror(DELTOID_LATERAL_L), lx: 112, ly: 58 }]),
+  zone("Deltoides Anterior", [{ d: DELTOID_INNER_L, lx: 48, ly: 58 }, { d: mirror(DELTOID_INNER_L), lx: 112, ly: 58 }]),
+  zone("Deltoides Lateral", [{ d: DELTOID_OUTER_L, lx: 8, ly: 44 }, { d: mirror(DELTOID_OUTER_L), lx: 152, ly: 44 }]),
   zone("Pecho", [
     { d: "80,54 66,58 58,72 64,86 80,82", lx: 58, ly: 68 },
     { d: mirror("80,54 66,58 58,72 64,86 80,82"), lx: 102, ly: 68 },
@@ -551,8 +562,8 @@ const FRONT_ZONES = [
 ];
 
 const BACK_ZONES = [
-  zone("Deltoides Posterior", [{ d: DELTOID_MEDIAL_L, lx: 8, ly: 44 }, { d: mirror(DELTOID_MEDIAL_L), lx: 152, ly: 44 }]),
-  zone("Deltoides Lateral", [{ d: DELTOID_LATERAL_L, lx: 48, ly: 58 }, { d: mirror(DELTOID_LATERAL_L), lx: 112, ly: 58 }]),
+  zone("Deltoides Posterior", [{ d: DELTOID_INNER_L, lx: 48, ly: 58 }, { d: mirror(DELTOID_INNER_L), lx: 112, ly: 58 }]),
+  zone("Deltoides Lateral", [{ d: DELTOID_OUTER_L, lx: 8, ly: 44 }, { d: mirror(DELTOID_OUTER_L), lx: 152, ly: 44 }]),
   zone("Espalda Alta/Trapecios", [{ d: "80,40 100,46 92,80 68,80 60,46", lx: 80, ly: 52 }]),
   zone("Dorsales", [
     { d: "58,58 76,62 70,120 52,140 44,90", lx: 40, ly: 105 },
@@ -1250,12 +1261,29 @@ export default function NutriDash() {
   const [blocks, setBlocks] = useState(stored.blocks ?? []);
   const [weeks, setWeeks] = useState(stored.weeks ?? []);
   const [days, setDays] = useState(stored.days ?? []);
-  const [dayExercises, setDayExercises] = useState(stored.dayExercises ?? []);
+  const [dayExercises, setDayExercises] = useState(() => {
+    // 1) Traduce ids viejos basados en posición (ex1, ex2...) a los nuevos ids fijos por nombre.
+    const raw = (stored.dayExercises ?? []).map((e) => ({
+      ...e,
+      catalogExerciseId: OLD_EXERCISE_ID_MIGRATION[e.catalogExerciseId] ?? e.catalogExerciseId,
+    }));
+    // 2) Sana colisiones de `order` ya guardadas de antes del fix (dos ejercicios del mismo día con el mismo
+    //    valor no se pueden reordenar entre sí). Renumera por día, respetando el orden relativo que ya tenían.
+    const byDay = {};
+    raw.forEach((e) => { (byDay[e.dayId] ??= []).push(e); });
+    const fixed = [];
+    Object.values(byDay).forEach((list) => {
+      list.sort((a, b) => a.order - b.order);
+      list.forEach((e, i) => fixed.push({ ...e, order: i }));
+    });
+    return fixed;
+  });
   const [sets, setSets] = useState(stored.sets ?? []);
 
   const [activeBlockId, setActiveBlockId] = useState(null);
   const [expandedWeekId, setExpandedWeekId] = useState(null);
   const [mapScope, setMapScope] = useState("semana"); // 'semana' | 'bloque'
+  const [expandedVolumeGroup, setExpandedVolumeGroup] = useState(null);
   const [mapWeekId, setMapWeekId] = useState(null);
   const [selectedDayId, setSelectedDayId] = useState(null);
 
@@ -1796,10 +1824,12 @@ export default function NutriDash() {
         const catalogEx = catalog.find((c) => c.id === ex.catalogExerciseId);
         if (!catalogEx?.targets) return;
         const setCount = getSetsForExercise(ex.id).length;
+        if (setCount === 0) return; // sin series registradas, no "contribuyó" todavía
         catalogEx.targets.forEach(({ group, role }) => {
-          if (!breakdown[group]) breakdown[group] = { direct: 0, indirect: 0 };
+          if (!breakdown[group]) breakdown[group] = { direct: 0, indirect: 0, exercises: [] };
           if (role === "primary") breakdown[group].direct += setCount;
           else breakdown[group].indirect += setCount * SECONDARY_SET_WEIGHT;
+          breakdown[group].exercises.push({ name: ex.variantName, role, sets: setCount });
         });
       });
     });
@@ -2971,7 +3001,7 @@ export default function NutriDash() {
                     ? getMuscleVolumeBreakdownForBlock(block.id)
                     : (currentMapWeekId ? getMuscleVolumeBreakdownForWeek(currentMapWeekId) : {});
                   const breakdownRows = Object.entries(volumeBreakdown)
-                    .map(([group, { direct, indirect }]) => ({ group, direct, indirect, total: direct + indirect }))
+                    .map(([group, { direct, indirect, exercises }]) => ({ group, direct, indirect, total: direct + indirect, exercises }))
                     .sort((a, b) => b.total - a.total);
                   return (
                     <Panel>
@@ -3011,14 +3041,39 @@ export default function NutriDash() {
                                 </tr>
                               </thead>
                               <tbody style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                                {breakdownRows.map((row) => (
-                                  <tr key={row.group} style={{ borderTop: "1px solid var(--border)" }}>
-                                    <td style={{ padding: "6px 0", fontFamily: "'Inter', sans-serif", color: "var(--text)" }}>{row.group}</td>
-                                    <td style={{ textAlign: "right", color: "var(--accent)" }}>{round(row.direct, 1)}</td>
-                                    <td style={{ textAlign: "right", color: "var(--accent2)" }}>{round(row.indirect, 1)}</td>
-                                    <td style={{ textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{round(row.total, 1)}</td>
-                                  </tr>
-                                ))}
+                                {breakdownRows.flatMap((row) => {
+                                  const isOpen = expandedVolumeGroup === row.group;
+                                  const rows = [
+                                    <tr key={row.group} onClick={() => setExpandedVolumeGroup(isOpen ? null : row.group)} style={{ borderTop: "1px solid var(--border)", cursor: "pointer" }}>
+                                      <td style={{ padding: "6px 0", fontFamily: "'Inter', sans-serif", color: "var(--text)" }}>
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                          {isOpen ? <ChevronUp size={11} color="var(--text-dim)" /> : <ChevronDown size={11} color="var(--text-dim)" />}
+                                          {row.group}
+                                        </span>
+                                      </td>
+                                      <td style={{ textAlign: "right", color: "var(--accent)" }}>{round(row.direct, 1)}</td>
+                                      <td style={{ textAlign: "right", color: "var(--accent2)" }}>{round(row.indirect, 1)}</td>
+                                      <td style={{ textAlign: "right", fontWeight: 700, color: "var(--text)" }}>{round(row.total, 1)}</td>
+                                    </tr>,
+                                  ];
+                                  if (isOpen) {
+                                    rows.push(
+                                      <tr key={`${row.group}-detail`}>
+                                        <td colSpan={4} style={{ padding: "2px 0 10px 16px" }}>
+                                          {row.exercises.map((c, i) => (
+                                            <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11, padding: "3px 0", fontFamily: "'Inter', sans-serif", color: "var(--text-dim)" }}>
+                                              <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                {c.name} <span style={{ color: c.role === "primary" ? "var(--accent)" : "var(--accent2)", fontSize: 9.5 }}>({c.role === "primary" ? "primario" : "secundario"})</span>
+                                              </span>
+                                              <span style={{ fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{c.sets} series</span>
+                                            </div>
+                                          ))}
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+                                  return rows;
+                                })}
                               </tbody>
                             </table>
                           )}
