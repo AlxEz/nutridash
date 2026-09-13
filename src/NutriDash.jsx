@@ -3,7 +3,7 @@ import {
   Beef, Wheat, Droplet, Plus, Minus, Trash2, User, Footprints,
   Dumbbell, Sunrise, Sun, Moon, Search, Gauge as GaugeIcon, X, ChevronDown, ChevronUp,
   Lightbulb, Camera, ImageOff, Scale, Layers, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, Copy,
-  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell, Leaf, Sparkles,
+  UtensilsCrossed, Activity, Ruler, Pencil, CheckCircle2, Circle, AlertTriangle, CalendarClock, Timer as TimerIcon, RotateCcw, ChevronLeft, Download, Upload, Home, ScanLine, Bell, Leaf, Sparkles, Share2,
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -344,11 +344,11 @@ function calcTargetCalories(tdee, goal, deficitAmount, surplusAmount) {
 }
 
 const GENERAL_ACTIVITY_LEVELS = [
-  { value: "sedentario", label: "Sedentario", mult: 1.2 },
-  { value: "ligero", label: "Ligeramente activo", mult: 1.375 },
-  { value: "moderado", label: "Moderadamente activo", mult: 1.55 },
-  { value: "activo", label: "Muy activo", mult: 1.725 },
-  { value: "hiperactivo", label: "Hiperactivo", mult: 1.9 },
+  { value: "sedentario", label: "Sedentario", mult: 1.2, example: "Trabajo de oficina, casi no caminas ni haces ejercicio en la semana." },
+  { value: "ligero", label: "Ligeramente activo", mult: 1.375, example: "Ejercicio ligero 1-3 días a la semana, o trabajo de pie parte del día." },
+  { value: "moderado", label: "Moderadamente activo", mult: 1.55, example: "Ejercicio moderado 3-5 días a la semana, o caminas bastante en tu trabajo." },
+  { value: "activo", label: "Muy activo", mult: 1.725, example: "Ejercicio intenso 6-7 días a la semana, o trabajo físico demandante." },
+  { value: "hiperactivo", label: "Hiperactivo", mult: 1.9, example: "Entrenas 2 veces al día, o tu trabajo es físico pesado y además entrenas." },
 ];
 
 const GOAL_META = {
@@ -1294,6 +1294,11 @@ export default function NutriDash() {
   const [confirmDeleteBlockId, setConfirmDeleteBlockId] = useState(null);
   const [duplicateBlockId, setDuplicateBlockId] = useState(null);
   const [duplicateBlockForm, setDuplicateBlockForm] = useState({ name: "", startDate: todayISO() });
+  const [shareBlockId, setShareBlockId] = useState(null);
+  const [showImportBlockModal, setShowImportBlockModal] = useState(false);
+  const [importBlockCode, setImportBlockCode] = useState("");
+  const [importBlockName, setImportBlockName] = useState("");
+  const [importBlockStartDate, setImportBlockStartDate] = useState(todayISO());
 
   const [newWeekBlockId, setNewWeekBlockId] = useState(null);
   const [newWeekName, setNewWeekName] = useState("");
@@ -1316,7 +1321,11 @@ export default function NutriDash() {
   const [exerciseMuscleFilter, setExerciseMuscleFilter] = useState(null); // null | 'Pecho' | 'Espalda' | 'Pierna' | 'Hombro' | 'Brazo' | 'Core'
   const [variantDrafts, setVariantDrafts] = useState({});
   const [showCustomExerciseForm, setShowCustomExerciseForm] = useState(false);
-  const [customExerciseForm, setCustomExerciseForm] = useState({ name: "", muscleGroup: MUSCLE_GROUPS[0] });
+  const [customExerciseForm, setCustomExerciseForm] = useState({ name: "", muscleGroup: MUSCLE_GROUPS[0], secondaries: [] });
+  const [showExerciseEditor, setShowExerciseEditor] = useState(false);
+  const [editExerciseSearch, setEditExerciseSearch] = useState("");
+  const [editingExercise, setEditingExercise] = useState(null); // ejercicio del catálogo seleccionado para corregir sus músculos
+  const [editExerciseDraft, setEditExerciseDraft] = useState(null); // { primary, secondaries }
 
   const [setDrafts, setSetDrafts] = useState({});
 
@@ -1796,6 +1805,99 @@ export default function NutriDash() {
     setBlocks((prev) => prev.map((b) => (b.id === blockId ? { ...b, goal: newGoal } : b)));
   }
 
+  /** Codifica texto UTF-8 (acentos incluidos) a base64 de forma segura, y de regreso. */
+  function utf8ToBase64(str) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16))));
+  }
+  function base64ToUtf8(b64) {
+    return decodeURIComponent(atob(b64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""));
+  }
+
+  /** Genera el código para compartir un bloque: estructura, ejercicios y número de series — SIN pesos, reps ni RIR. */
+  function generateBlockShareCode(blockId) {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return "";
+    const payload = {
+      v: 1,
+      block: { name: block.name, goal: block.goal },
+      weeks: getWeeksForBlock(blockId).map((w) => ({
+        label: w.label,
+        days: getDaysForWeek(w.id).map((d) => ({
+          name: d.name,
+          isRestDay: !!d.isRestDay,
+          exercises: getExercisesForDay(d.id).map((ex) => {
+            const catalogEx = catalog.find((c) => c.id === ex.catalogExerciseId);
+            return {
+              catalogId: ex.catalogExerciseId,
+              name: catalogEx?.name ?? ex.variantName,
+              targets: catalogEx?.isCustom ? catalogEx.targets : null, // solo se manda la definición si es un ejercicio personalizado, para poder recrearlo del otro lado
+              variantName: ex.variantName,
+              setCount: getSetsForExercise(ex.id).length,
+            };
+          }),
+        })),
+      })),
+    };
+    return utf8ToBase64(JSON.stringify(payload));
+  }
+
+  /** Reconstruye un bloque completo a partir de un código compartido: mismos ejercicios y número de series, series vacías listas para llenar. */
+  function importBlockFromCode(code, name, startDate) {
+    let payload;
+    try {
+      payload = JSON.parse(base64ToUtf8(code.trim()));
+    } catch {
+      toast("Ese código no es válido o está incompleto");
+      return;
+    }
+    if (!payload || !Array.isArray(payload.weeks)) { toast("Ese código no es válido"); return; }
+
+    const newCatalogEntries = [];
+    function resolveCatalogId(ex) {
+      let found = catalog.find((c) => c.id === ex.catalogId) || newCatalogEntries.find((c) => c.id === ex.catalogId);
+      if (found) return found.id;
+      found = catalog.find((c) => c.name === ex.name) || newCatalogEntries.find((c) => c.name === ex.name);
+      if (found) return found.id;
+      if (ex.targets) {
+        const entry = { id: uid(), name: ex.name, targets: ex.targets, isCustom: true };
+        newCatalogEntries.push(entry);
+        return entry.id;
+      }
+      return null; // no existe en este dispositivo y no venía su definición — se omite ese ejercicio
+    }
+
+    const newBlock = { id: uid(), name: (name || "").trim() || payload.block?.name || "Bloque importado", startDate, endDate: null, goal: payload.block?.goal || "mantenimiento" };
+    const newWeeks = [], newDays = [], newExercises = [], newSets = [];
+    payload.weeks.forEach((w, wi) => {
+      const week = { id: uid(), blockId: newBlock.id, order: wi, label: w.label || `Semana ${wi + 1}`, clonedFromWeekId: null };
+      newWeeks.push(week);
+      (w.days || []).forEach((d, di) => {
+        const day = { id: uid(), weekId: week.id, date: addDaysToDate(startDate, wi * 7 + di), order: di, name: d.name || `Día ${di + 1}`, completed: false, isRestDay: !!d.isRestDay };
+        newDays.push(day);
+        (d.exercises || []).forEach((ex, ei) => {
+          const catalogId = resolveCatalogId(ex);
+          if (!catalogId) return;
+          const newEx = { id: uid(), dayId: day.id, catalogExerciseId: catalogId, variantName: ex.variantName || ex.name, order: ei, sourceDayExerciseId: null };
+          newExercises.push(newEx);
+          for (let s = 0; s < (ex.setCount || 0); s++) {
+            newSets.push({ id: uid(), dayExerciseId: newEx.id, order: s, weight: "", unit: "kg", reps: "", rir: "" });
+          }
+        });
+      });
+    });
+
+    if (newCatalogEntries.length > 0) setCatalog((prev) => [...newCatalogEntries, ...prev]);
+    setBlocks((prev) => [...prev, newBlock]);
+    setWeeks((prev) => [...prev, ...newWeeks]);
+    setDays((prev) => [...prev, ...newDays]);
+    setDayExercises((prev) => [...prev, ...newExercises]);
+    setSets((prev) => [...prev, ...newSets]);
+    setActiveBlockId(newBlock.id);
+    setShowImportBlockModal(false);
+    setImportBlockCode("");
+    toast(`Bloque "${newBlock.name}" importado correctamente`);
+  }
+
   function getWeeksForBlock(blockId) {
     return weeks.filter((w) => w.blockId === blockId).sort((a, b) => a.order - b.order);
   }
@@ -2045,13 +2147,33 @@ export default function NutriDash() {
     toast(`"${variantName}" añadido a la rutina`);
   }
 
+  /** Abre el formulario de corrección de músculos de un ejercicio ya cargado (precargado o personalizado). */
+  function startEditingExercise(ex) {
+    setEditingExercise(ex);
+    const primary = ex.targets.find((t) => t.role === P)?.group ?? ex.targets[0]?.group ?? MUSCLE_GROUPS[0];
+    const secondaries = ex.targets.filter((t) => t.role === S).map((t) => t.group);
+    setEditExerciseDraft({ primary, secondaries });
+  }
+
+  /** Guarda los músculos corregidos (principal + secundarios) sobre el ejercicio existente en `catalog`. */
+  function saveExerciseEdit() {
+    if (!editingExercise || !editExerciseDraft) return;
+    const { primary, secondaries } = editExerciseDraft;
+    const targets = [{ group: primary, role: P }, ...secondaries.filter((g) => g !== primary).map((g) => ({ group: g, role: S }))];
+    setCatalog((prev) => prev.map((c) => (c.id === editingExercise.id ? { ...c, targets } : c)));
+    toast(`Músculos de "${editingExercise.name}" actualizados`);
+    setEditingExercise(null);
+    setEditExerciseDraft(null);
+  }
+
   function addCustomCatalogExercise() {
-    const { name, muscleGroup } = customExerciseForm;
+    const { name, muscleGroup, secondaries } = customExerciseForm;
     if (!name.trim()) return;
-    const entry = { id: uid(), name: name.trim(), targets: t1(muscleGroup), isCustom: true };
+    const targets = [{ group: muscleGroup, role: P }, ...secondaries.filter((g) => g !== muscleGroup).map((g) => ({ group: g, role: S }))];
+    const entry = { id: uid(), name: name.trim(), targets, isCustom: true };
     setCatalog((prev) => [entry, ...prev]);
     addExerciseFromPicker(entry); // se agrega directo al día y cierra el modal + toast
-    setCustomExerciseForm({ name: "", muscleGroup: MUSCLE_GROUPS[0] });
+    setCustomExerciseForm({ name: "", muscleGroup: MUSCLE_GROUPS[0], secondaries: [] });
     setShowCustomExerciseForm(false);
   }
 
@@ -2885,9 +3007,12 @@ export default function NutriDash() {
                           <button onClick={() => removeBlock(b.id)} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, background: "var(--danger)", color: "#07060B" }}>Eliminar</button>
                         </div>
                       ) : (
-                        <div style={{ display: "flex", gap: 8, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                        <div style={{ display: "flex", gap: 8, marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
                           <button onClick={() => { setDuplicateBlockId(b.id); setDuplicateBlockForm({ name: `Copia de ${b.name}`, startDate: todayISO() }); }} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}>
                             <Copy size={12} /> Duplicar
+                          </button>
+                          <button onClick={() => setShareBlockId(b.id)} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 5, color: "var(--accent2)" }}>
+                            <Share2 size={12} /> Compartir
                           </button>
                           <button onClick={() => setConfirmDeleteBlockId(b.id)} style={{ ...iconBtnStyle, width: "auto", padding: "5px 10px", fontSize: 11, color: "var(--danger)", display: "flex", alignItems: "center", gap: 5 }}>
                             <Trash2 size={12} /> Eliminar
@@ -2898,7 +3023,10 @@ export default function NutriDash() {
                   ))}
                 </div>
               )}
-              <button onClick={() => setShowNewBlockModal(true)} style={dashedButtonStyle}><Plus size={16} /> Nuevo bloque</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowNewBlockModal(true)} style={{ ...dashedButtonStyle, flex: 1 }}><Plus size={16} /> Nuevo bloque</button>
+                <button onClick={() => { setShowImportBlockModal(true); setImportBlockCode(""); setImportBlockName(""); }} style={{ ...dashedButtonStyle, flex: 1, borderColor: "var(--accent2)55", color: "var(--accent2)" }}><Download size={16} /> Importar código</button>
+              </div>
             </Panel>
           )}
 
@@ -2918,6 +3046,9 @@ export default function NutriDash() {
                         {formatDateEs(block.startDate)} – {block.endDate ? formatDateEs(block.endDate) : "sin fecha de fin"}
                       </div>
                     </div>
+                    <button onClick={() => setShareBlockId(block.id)} style={{ ...iconBtnStyle, color: "var(--accent2)" }} title="Compartir bloque">
+                      <Share2 size={14} />
+                    </button>
                     <button onClick={() => { setEditBlockId(block.id); setEditBlockForm({ name: block.name, startDate: block.startDate, endDate: block.endDate || "" }); }} style={iconBtnStyle} title="Editar bloque">
                       <Pencil size={14} />
                     </button>
@@ -3244,11 +3375,28 @@ export default function NutriDash() {
 
             {activityMode === "general" ? (
               <Field label="Nivel de actividad">
-                <select style={selectStyle} value={generalActivityLevel} onChange={(e) => setGeneralActivityLevel(e.target.value)}>
-                  {GENERAL_ACTIVITY_LEVELS.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label} (×{l.mult})</option>
-                  ))}
-                </select>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {GENERAL_ACTIVITY_LEVELS.map((l) => {
+                    const active = generalActivityLevel === l.value;
+                    return (
+                      <button
+                        key={l.value}
+                        onClick={() => setGeneralActivityLevel(l.value)}
+                        style={{
+                          textAlign: "left", padding: "10px 12px", borderRadius: 10, cursor: "pointer",
+                          border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+                          background: active ? "var(--accent)14" : "var(--panel2)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: active ? "var(--accent)" : "var(--text)" }}>{l.label}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--text-dim)" }}>×{l.mult}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.4 }}>{l.example}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </Field>
             ) : (
               <>
@@ -3939,6 +4087,60 @@ export default function NutriDash() {
         </ModalShell>
       )}
 
+      {/* -------------------- MODAL: COMPARTIR BLOQUE -------------------- */}
+      {shareBlockId && (() => {
+        const code = generateBlockShareCode(shareBlockId);
+        return (
+          <ModalShell title="Compartir bloque" onClose={() => setShareBlockId(null)}>
+            <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+              Este código incluye la estructura del bloque, los ejercicios y cuántas series tiene cada uno.
+              <strong style={{ color: "var(--text)" }}> No incluye tus pesos, repeticiones ni RIR</strong> — quien lo importe recibe las series vacías, listas para llenar con sus propios números.
+            </div>
+            <textarea
+              readOnly
+              value={code}
+              onClick={(e) => e.target.select()}
+              style={{ width: "100%", minHeight: 120, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "#0D0B14", color: "var(--text-dim)", fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, resize: "vertical", marginBottom: 12, boxSizing: "border-box" }}
+            />
+            <button
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(code); toast("Código copiado"); }
+                catch { toast("No se pudo copiar — selecciona el texto manualmente"); }
+              }}
+              style={primaryButtonStyle}
+            >
+              <Copy size={16} /> Copiar código
+            </button>
+          </ModalShell>
+        );
+      })()}
+
+      {/* -------------------- MODAL: IMPORTAR BLOQUE POR CÓDIGO -------------------- */}
+      {showImportBlockModal && (
+        <ModalShell title="Importar bloque por código" onClose={() => setShowImportBlockModal(false)}>
+          <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 12, lineHeight: 1.5 }}>
+            Pega el código que te compartieron. Se crea un bloque nuevo con los mismos ejercicios y número de series, con los campos de peso/reps/RIR vacíos para que los llenes tú.
+          </div>
+          <Field label="Código">
+            <textarea
+              value={importBlockCode}
+              onChange={(e) => setImportBlockCode(e.target.value)}
+              placeholder="Pega aquí el código..."
+              style={{ width: "100%", minHeight: 100, padding: 10, borderRadius: 9, border: "1px solid var(--border)", background: "#0D0B14", color: "var(--text)", fontFamily: "'JetBrains Mono', monospace", fontSize: 11, resize: "vertical", boxSizing: "border-box" }}
+            />
+          </Field>
+          <Field label="Nombre del bloque (opcional)">
+            <input style={selectStyle} value={importBlockName} onChange={(e) => setImportBlockName(e.target.value)} placeholder="Se usa el nombre original si lo dejas vacío" />
+          </Field>
+          <Field label="Fecha de inicio">
+            <input type="date" style={inputStyle} value={importBlockStartDate} onChange={(e) => setImportBlockStartDate(e.target.value)} />
+          </Field>
+          <button onClick={() => importBlockFromCode(importBlockCode, importBlockName, importBlockStartDate)} disabled={!importBlockCode.trim()} style={{ ...primaryButtonStyle, opacity: importBlockCode.trim() ? 1 : 0.5 }}>
+            <Upload size={16} /> Importar bloque
+          </button>
+        </ModalShell>
+      )}
+
       {/* -------------------- MODAL: NUEVA SEMANA -------------------- */}
       {newWeekBlockId && (
         <ModalShell title="Nueva semana" onClose={() => setNewWeekBlockId(null)}>
@@ -4044,6 +4246,9 @@ export default function NutriDash() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 10 }}>
             <Search size={15} color="var(--text-dim)" />
             <input value={exerciseSearch} onChange={(e) => setExerciseSearch(e.target.value)} placeholder="Buscar ejercicio..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+            <button onClick={() => { setShowExerciseEditor(true); setEditExerciseSearch(""); setEditingExercise(null); }} title="Editar músculos de un ejercicio" style={{ background: "var(--accent2)1A", border: "1px solid var(--accent2)55", borderRadius: 6, cursor: "pointer", color: "var(--accent2)", padding: 4, display: "flex", flexShrink: 0 }}>
+              <Pencil size={14} />
+            </button>
           </div>
 
           <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
@@ -4076,10 +4281,35 @@ export default function NutriDash() {
               <Field label="Nombre general">
                 <input style={selectStyle} value={customExerciseForm.name} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej. Hack squat" />
               </Field>
-              <Field label="Grupo muscular">
-                <select style={selectStyle} value={customExerciseForm.muscleGroup} onChange={(e) => setCustomExerciseForm((f) => ({ ...f, muscleGroup: e.target.value }))}>
+              <Field label="Grupo muscular principal">
+                <select
+                  style={selectStyle}
+                  value={customExerciseForm.muscleGroup}
+                  onChange={(e) => setCustomExerciseForm((f) => ({ ...f, muscleGroup: e.target.value, secondaries: f.secondaries.filter((g) => g !== e.target.value) }))}
+                >
                   {MUSCLE_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
+              </Field>
+              <Field label="Músculos secundarios (opcional)">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {MUSCLE_GROUPS.filter((g) => g !== customExerciseForm.muscleGroup).map((g) => {
+                    const active = customExerciseForm.secondaries.includes(g);
+                    return (
+                      <button
+                        key={g}
+                        onClick={() => setCustomExerciseForm((f) => ({ ...f, secondaries: active ? f.secondaries.filter((x) => x !== g) : [...f.secondaries, g] }))}
+                        style={{
+                          padding: "5px 10px", borderRadius: 20, fontSize: 11.5, cursor: "pointer",
+                          border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+                          background: active ? "var(--accent2)1A" : "var(--panel2)",
+                          color: active ? "var(--accent2)" : "var(--text-dim)",
+                        }}
+                      >
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
               </Field>
               <button onClick={addCustomCatalogExercise} style={{ ...primaryButtonStyle, background: "var(--accent2)" }}>
                 <Plus size={16} /> Guardar en el catálogo
@@ -4130,6 +4360,71 @@ export default function NutriDash() {
         }}>
           <CheckCircle2 size={16} color="var(--success)" style={{ flexShrink: 0 }} /> {toastMsg}
         </div>
+      )}
+
+      {/* -------------------- MODAL: EDITOR DE MÚSCULOS DE EJERCICIOS -------------------- */}
+      {showExerciseEditor && (
+        <ModalShell
+          title={editingExercise ? `Editar músculos de "${editingExercise.name}"` : "Editar músculos de ejercicios"}
+          onClose={() => { setShowExerciseEditor(false); setEditingExercise(null); setEditExerciseDraft(null); }}
+        >
+          {!editingExercise ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0D0B14", border: "1px solid var(--border)", borderRadius: 9, padding: "8px 12px", marginBottom: 12 }}>
+                <Search size={15} color="var(--text-dim)" />
+                <input value={editExerciseSearch} onChange={(e) => setEditExerciseSearch(e.target.value)} placeholder="Buscar ejercicio a corregir..." style={{ border: "none", background: "transparent", outline: "none", color: "var(--text)", fontSize: 13.5, width: "100%" }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: "50vh", overflowY: "auto" }}>
+                {catalog.filter((c) => c.name.toLowerCase().includes(editExerciseSearch.toLowerCase())).map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => startEditingExercise(c)}
+                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--panel2)", cursor: "pointer", color: "var(--text)" }}
+                  >
+                    <div style={{ textAlign: "left", minWidth: 0 }}>
+                      <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+                      <div style={{ fontSize: 10.5, color: "var(--text-dim)" }}>{targetsLabel(c)}</div>
+                    </div>
+                    <Pencil size={13} color="var(--text-dim)" style={{ flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Músculo principal">
+                <select style={selectStyle} value={editExerciseDraft.primary} onChange={(e) => setEditExerciseDraft((d) => ({ primary: e.target.value, secondaries: d.secondaries.filter((g) => g !== e.target.value) }))}>
+                  {MUSCLE_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </Field>
+              <Field label="Músculos secundarios">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {MUSCLE_GROUPS.filter((g) => g !== editExerciseDraft.primary).map((g) => {
+                    const active = editExerciseDraft.secondaries.includes(g);
+                    return (
+                      <button
+                        key={g}
+                        onClick={() => setEditExerciseDraft((d) => ({ ...d, secondaries: active ? d.secondaries.filter((x) => x !== g) : [...d.secondaries, g] }))}
+                        style={{
+                          padding: "5px 10px", borderRadius: 20, fontSize: 11.5, cursor: "pointer",
+                          border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+                          background: active ? "var(--accent2)1A" : "var(--panel2)",
+                          color: active ? "var(--accent2)" : "var(--text-dim)",
+                        }}
+                      >
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button onClick={() => { setEditingExercise(null); setEditExerciseDraft(null); }} style={{ flex: 1, padding: "10px", borderRadius: 9, border: "1px solid var(--border)", background: "transparent", color: "var(--text)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Atrás</button>
+                <button onClick={saveExerciseEdit} style={{ flex: 2, padding: "10px", borderRadius: 9, border: "none", background: "var(--accent2)", color: "#07060B", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Guardar corrección</button>
+              </div>
+            </>
+          )}
+        </ModalShell>
       )}
 
       <BottomBar active={appView} onNavigate={setAppView} />
